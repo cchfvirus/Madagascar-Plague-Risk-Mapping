@@ -2,9 +2,7 @@
 
 # Interactive Plague Risk Mapping for Madagascar 🗺️
 
-Plague continues to cause deadly outbreaks in Madagascar, yet health officials lack detailed maps showing where disease risk is highest. This study created the most detailed plague risk map ever produced for Madagascar by analyzing where plague cases have occurred over the past 85 years and identifying the environmental conditions—such as elevation, rainfall, and temperature—that favor disease transmission. 
-
-By combining this information with population data, the study identified communities at greatest risk, finding that over 15 million people live in plague-prone areas, with nearly 10 million in high-risk zones concentrated in Madagascar's Central Highland regions. This detailed community-level risk assessment enables health authorities to target disease surveillance, prevention efforts, and resources to specific locations where plague is most likely to occur, potentially saving lives through earlier detection and response to outbreaks.
+Plague continues to cause deadly outbreaks in Madagascar, yet health officials lack detailed maps showing where disease risk is highest. This detailed community-level risk assessment enables health authorities to target disease surveillance, prevention efforts, and resources to specific locations where plague is most likely to occur, potentially saving lives through earlier detection and response to outbreaks.
 
 **Explore the interactive map:** https://cchfvirus.github.io/Madagascar-Plague-Risk-Mapping/
 

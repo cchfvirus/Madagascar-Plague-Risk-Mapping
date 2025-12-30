@@ -449,17 +449,22 @@
                         opacity: 0.75,
                         pixelValuesToColorFn: function(values) {
                             var value = values[0];
-                            
-                            // Handle null/undefined/NaN values
-                            if (value === null || value === undefined || isNaN(value)) {
-                                return null; // Always transparent for null values
-                            }
-                            
-                            return scale(value).hex();
-                        },
-                        resolution: 256,
-                        pane: 'rasterPane' // Use custom pane for raster layers
-                    });
+        
+                        // Handle null/undefined/NaN values
+                        if (value === null || value === undefined || isNaN(value)) {
+                            return null;
+                        }
+        
+                        // For risk zones, filter out values outside valid range (0-4)
+                        if (layerId === 'risk' && (value < 0 || value > 4)) {
+                            return null;
+                        }
+        
+                        return scale(value).hex();
+                    },
+                    resolution: 256,
+                    pane: 'rasterPane'
+                });
                     
                     layers[layerId] = layer;
                     loadedCount++;
@@ -656,4 +661,5 @@
         loadMadagascarBackground();
     </script>
 </body>
+
 </html>

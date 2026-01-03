@@ -210,7 +210,6 @@
         var loadedCount = 0;
         var totalLayers = 3;
         var plagueCasesLayer = null;
-        var madagascarBackgroundLayer = null;
         var highRiskBoundariesLayer = null;
 
         // Layer configurations
@@ -223,9 +222,7 @@
                 labels: ['Low Suitability', 'High Suitability'],
                 description: '',
                 mode: 'lch',
-                continuousLegend: true,
-                blackBackground: false,
-                useBackgroundPolygon: false
+                continuousLegend: true
             },
             'risk': {
                 file: 'risk_zones_cog.tif',
@@ -234,9 +231,7 @@
                 domain: [0, 4],
                 labels: ['Low Risk', 'High Risk'],
                 description: 'Plague Transmission Risk Zones',
-                continuousLegend: true,
-                blackBackground: false,
-                useBackgroundPolygon: true
+                continuousLegend: true
             },
             'hotspot': {
                 file: 'hotspot_cog.tif',
@@ -246,8 +241,6 @@
                 labels: ['Cold Spot', 'Not Significant', 'Hot Spot'],
                 description: 'Getis-Ord Gi* statistic showing spatial clustering of plague risk',
                 customLegend: true,
-                blackBackground: false,
-                useBackgroundPolygon: false,
                 legendItems: [
                     { value: 2.58, color: '#ca0020', label: 'Hot Spot with 99% Confidence' },
                     { value: 1.96, color: '#f4a582', label: 'Hot Spot with 95% Confidence' },
@@ -312,37 +305,6 @@
             setTimeout(function() {
                 notification.classList.remove('show');
             }, 2000);
-        }
-
-        // Load Madagascar boundary as background polygon
-        function loadMadagascarBackground() {
-            fetch('madagascar_boundary.geojson')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Madagascar boundary file not found');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    updateStatus('Loaded Madagascar boundary');
-                    
-                    madagascarBackgroundLayer = L.geoJSON(data, {
-                        style: {
-                            fillColor: '#000000',
-                            fillOpacity: 0.5,
-                            color: '#333333',
-                            weight: 1,
-                            opacity: 0.5
-                        },
-                        pane: 'backgroundPane' // Use custom pane with lower z-index
-                    });
-                    
-                    // Don't add to map yet - only show when risk layer is active
-                })
-                .catch(error => {
-                    console.error('Error loading Madagascar boundary:', error);
-                    updateStatus('Note: Madagascar background not available', false);
-                });
         }
 
         // Update loading status
@@ -520,12 +482,6 @@
                     
                     // If this is the first layer loaded, show it and fit bounds
                     if (!currentLayer) {
-                        // Add background polygon if this layer needs it
-                        if (config.useBackgroundPolygon && madagascarBackgroundLayer) {
-                            madagascarBackgroundLayer.addTo(map);
-                        }
-                        
-                        // Then add the raster layer
                         layer.addTo(map);
                         currentLayer = layerId;
                         map.fitBounds(layer.getBounds());
@@ -558,20 +514,7 @@
                 map.removeLayer(layers[currentLayer]);
             }
             
-            // Remove background polygon if it exists
-            if (madagascarBackgroundLayer && map.hasLayer(madagascarBackgroundLayer)) {
-                map.removeLayer(madagascarBackgroundLayer);
-            }
-            
             if (layers[layerId]) {
-                var config = layerConfigs[layerId];
-                
-                // Add background polygon if this layer needs it
-                if (config.useBackgroundPolygon && madagascarBackgroundLayer) {
-                    madagascarBackgroundLayer.addTo(map);
-                }
-                
-                // Then add the raster layer
                 layers[layerId].addTo(map);
                 currentLayer = layerId;
                 updateLegend(layerId);
@@ -704,9 +647,6 @@
         
         // Load plague cases
         loadPlagueCases();
-        
-        // Load Madagascar background
-        loadMadagascarBackground();
         
         // Load high risk boundaries
         loadHighRiskBoundaries();

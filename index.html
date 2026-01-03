@@ -198,25 +198,11 @@
         map.createPane('boundariesPane');
         map.getPane('boundariesPane').style.zIndex = 350; // Above rasters, below overlays (plague cases)
 
-        // Define basemaps
-        var streetMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        // Add Esri Street Map basemap
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles © Esri',
             maxZoom: 19
-        });
-
-        var topoMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles © Esri',
-            maxZoom: 19
-        });
-
-        // Add default basemap (Street Map)
-        streetMap.addTo(map);
-
-        // Store basemaps
-        var baseMaps = {
-            "Street Map": streetMap,
-            "Topographic": topoMap
-        };
+        }).addTo(map);
 
         // Store layers
         var layers = {};
@@ -250,7 +236,7 @@
                 description: 'Plague Transmission Risk Zones',
                 continuousLegend: true,
                 blackBackground: false,
-                useBackgroundPolygon: false
+                useBackgroundPolygon: true
             },
             'hotspot': {
                 file: 'hotspot_cog.tif',
@@ -343,7 +329,7 @@
                     madagascarBackgroundLayer = L.geoJSON(data, {
                         style: {
                             fillColor: '#000000',
-                            fillOpacity: 0.4,
+                            fillOpacity: 0.5,
                             color: '#333333',
                             weight: 1,
                             opacity: 0.5
@@ -351,7 +337,7 @@
                         pane: 'backgroundPane' // Use custom pane with lower z-index
                     });
                     
-                    // Don't add to map yet - only show when hotspot layer is active
+                    // Don't add to map yet - only show when hotspot or risk layer is active
                 })
                 .catch(error => {
                     console.error('Error loading Madagascar boundary:', error);
@@ -655,14 +641,7 @@
         var layerControl = L.control({position: 'topleft'});
         layerControl.onAdd = function (map) {
             var div = L.DomUtil.create('div', 'layer-control');
-            
-            // Basemap section
-            div.innerHTML = '<h4>Basemaps</h4>';
-            div.innerHTML += '<label><input type="radio" name="basemap" value="street" checked onchange="switchBasemap(\'street\')">Street Map</label>';
-            div.innerHTML += '<label><input type="radio" name="basemap" value="topo" onchange="switchBasemap(\'topo\')">Topographic</label>';
-            
-            // Raster layers section
-            div.innerHTML += '<h4 style="margin-top:15px; padding-top:10px; border-top: 1px solid #ddd;">Risk Layers</h4>';
+            div.innerHTML = '<h4>Base Layers</h4>';
             
             Object.keys(layerConfigs).forEach(function(key, index) {
                 var checked = index === 0 ? 'checked' : '';
@@ -682,20 +661,6 @@
             return div;
         };
         layerControl.addTo(map);
-
-        // Switch basemap function
-        function switchBasemap(basemapType) {
-            // Remove all basemaps
-            map.removeLayer(streetMap);
-            map.removeLayer(topoMap);
-            
-            // Add selected basemap
-            if (basemapType === 'street') {
-                streetMap.addTo(map);
-            } else if (basemapType === 'topo') {
-                topoMap.addTo(map);
-            }
-        }
 
         // Create legend
         var legend = L.control({position: 'bottomright'});

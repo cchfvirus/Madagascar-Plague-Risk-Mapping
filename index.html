@@ -241,7 +241,7 @@
             'hotspot': {
                 file: 'hotspot_cog.tif',
                 name: 'Hot Spot Analysis (100m)',
-                colors: ['#0571b0', '#92c5de', '#f7f7f7', '#f4a582', '#ca0020'],
+                colors: ['#0571b0', '#92c5de', '#000000', '#f4a582', '#ca0020'],
                 domain: [-3, 3],
                 labels: ['Cold Spot', 'Not Significant', 'Hot Spot'],
                 description: 'Getis-Ord Gi* statistic showing spatial clustering of plague risk',
@@ -252,7 +252,7 @@
                     { value: 2.58, color: '#ca0020', label: 'Hot Spot with 99% Confidence' },
                     { value: 1.96, color: '#f4a582', label: 'Hot Spot with 95% Confidence' },
                     { value: 1.65, color: '#fddbc7', label: 'Hot Spot with 90% Confidence' },
-                    { value: 0, color: '#f00000', label: 'Not Significant' },
+                    { value: 0, color: '#000000', label: 'Not Significant' },
                     { value: -1.65, color: '#d1e5f0', label: 'Cold Spot with 90% Confidence' },
                     { value: -1.96, color: '#92c5de', label: 'Cold Spot with 95% Confidence' },
                     { value: -2.58, color: '#0571b0', label: 'Cold Spot with 99% Confidence' }
@@ -436,11 +436,11 @@
                     
                     highRiskBoundariesLayer = L.geoJSON(data, {
                         style: {
-                            fillColor: '#000000',  // Black fill
-                            fillOpacity: 0.2,      // 50% transparent so you can see layers underneath
-                            color: '#FFFFFF',      // White boundary
-                            weight: 2,             // Boundary thickness
-                            opacity: 1             // Solid white line
+                            fillColor: '#000000',
+                            fillOpacity: 0.5,
+                            color: '#FFFFFF',
+                            weight: 2,
+                            opacity: 1
                         },
                         interactive: false,  // Make non-clickable
                         pane: 'boundariesPane'  // Use custom pane below overlays
@@ -713,9 +713,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-

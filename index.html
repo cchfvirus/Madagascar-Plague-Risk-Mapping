@@ -198,11 +198,25 @@
         map.createPane('boundariesPane');
         map.getPane('boundariesPane').style.zIndex = 350; // Above rasters, below overlays (plague cases)
 
-        // Add OpenStreetMap basemap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors',
+        // Define basemaps
+        var streetMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles © Esri',
             maxZoom: 19
-        }).addTo(map);
+        });
+
+        var topoMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles © Esri',
+            maxZoom: 19
+        });
+
+        // Add default basemap (Street Map)
+        streetMap.addTo(map);
+
+        // Store basemaps
+        var baseMaps = {
+            "Street Map": streetMap,
+            "Topographic": topoMap
+        };
 
         // Store layers
         var layers = {};
@@ -241,7 +255,7 @@
             'hotspot': {
                 file: 'hotspot_cog.tif',
                 name: 'Hot Spot Analysis (100m)',
-                colors: ['#0571b0', '#92c5de', '#000000', '#f4a582', '#ca0020'],
+                colors: ['#0571b0', '#92c5de', '#f7f7f7', '#f4a582', '#ca0020'],
                 domain: [-3, 3],
                 labels: ['Cold Spot', 'Not Significant', 'Hot Spot'],
                 description: 'Getis-Ord Gi* statistic showing spatial clustering of plague risk',
@@ -252,7 +266,7 @@
                     { value: 2.58, color: '#ca0020', label: 'Hot Spot with 99% Confidence' },
                     { value: 1.96, color: '#f4a582', label: 'Hot Spot with 95% Confidence' },
                     { value: 1.65, color: '#fddbc7', label: 'Hot Spot with 90% Confidence' },
-                    { value: 0, color: '#000000', label: 'Not Significant' },
+                    { value: 0, color: '#f7f7f7', label: 'Not Significant' },
                     { value: -1.65, color: '#d1e5f0', label: 'Cold Spot with 90% Confidence' },
                     { value: -1.96, color: '#92c5de', label: 'Cold Spot with 95% Confidence' },
                     { value: -2.58, color: '#0571b0', label: 'Cold Spot with 99% Confidence' }
@@ -436,8 +450,8 @@
                     
                     highRiskBoundariesLayer = L.geoJSON(data, {
                         style: {
-                            fillColor: '#000000',
-                            fillOpacity: 0.5,
+                            fillColor: 'transparent',
+                            fillOpacity: 0,
                             color: '#FFFFFF',
                             weight: 2,
                             opacity: 1
@@ -641,7 +655,14 @@
         var layerControl = L.control({position: 'topleft'});
         layerControl.onAdd = function (map) {
             var div = L.DomUtil.create('div', 'layer-control');
-            div.innerHTML = '<h4>Base Layers</h4>';
+            
+            // Basemap section
+            div.innerHTML = '<h4>Basemaps</h4>';
+            div.innerHTML += '<label><input type="radio" name="basemap" value="street" checked onchange="switchBasemap(\'street\')">Street Map</label>';
+            div.innerHTML += '<label><input type="radio" name="basemap" value="topo" onchange="switchBasemap(\'topo\')">Topographic</label>';
+            
+            // Raster layers section
+            div.innerHTML += '<h4 style="margin-top:15px; padding-top:10px; border-top: 1px solid #ddd;">Risk Layers</h4>';
             
             Object.keys(layerConfigs).forEach(function(key, index) {
                 var checked = index === 0 ? 'checked' : '';
@@ -655,12 +676,26 @@
             div.innerHTML += '<div class="overlay-section">';
             div.innerHTML += '<h5>Overlays</h5>';
             div.innerHTML += '<label><input type="checkbox" id="plague-cases-toggle" checked onchange="togglePlagueCases(this.checked)">Plague Cases</label>';
-            div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">High Risk Boundaries</label>';
+            div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">High-Risk Regions</label>';
             div.innerHTML += '</div>';
             
             return div;
         };
         layerControl.addTo(map);
+
+        // Switch basemap function
+        function switchBasemap(basemapType) {
+            // Remove all basemaps
+            map.removeLayer(streetMap);
+            map.removeLayer(topoMap);
+            
+            // Add selected basemap
+            if (basemapType === 'street') {
+                streetMap.addTo(map);
+            } else if (basemapType === 'topo') {
+                topoMap.addTo(map);
+            }
+        }
 
         // Create legend
         var legend = L.control({position: 'bottomright'});

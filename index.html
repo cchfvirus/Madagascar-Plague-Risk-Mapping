@@ -436,11 +436,11 @@
                     
                     highRiskBoundariesLayer = L.geoJSON(data, {
                         style: {
-                            fillColor: 'transparent',
-                            fillOpacity: 0,
-                            color: '#000000',
-                            weight: 2,
-                            opacity: 0.8
+                            fillColor: '#000000',  // Black fill
+                            fillOpacity: 0.5,      // 50% transparent so you can see layers underneath
+                            color: '#FFFFFF',      // White boundary
+                            weight: 2,             // Boundary thickness
+                            opacity: 1             // Solid white line
                         },
                         interactive: false,  // Make non-clickable
                         pane: 'boundariesPane'  // Use custom pane below overlays
@@ -713,5 +713,6 @@
     </script>
 </body>
 </html>
+
 
 

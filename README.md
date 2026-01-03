@@ -10,7 +10,7 @@ Plague continues to cause deadly outbreaks in Madagascar, yet health officials l
 
 **Base Layers** (select one):
 - **Ecological Niche Model** - Environmental suitability for plague transmission
-- **Risk Zones** - Integrated transmission risk assessment  
+- **Risk Zones** - Integrated transmission risk assessment (Ecological Niche Model + LandScan Mosaic)
 - **Hot Spot Analysis** - Spatial clustering of plague activity (Getis-Ord Gi*)
 
 **Overlay Layer**:

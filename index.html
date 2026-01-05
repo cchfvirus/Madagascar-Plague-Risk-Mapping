@@ -494,9 +494,12 @@
                         ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
                         : chroma.scale(config.colors).domain(config.domain);
                     
+                    // Set opacity based on layer type - risk zones get 0.4, others get 0.75
+                    var layerOpacity = (layerId === 'risk') ? 0.4 : 0.75;
+                    
                     var layer = new GeoRasterLayer({
                         georaster: georaster,
-                        opacity: 0.75,
+                        opacity: layerOpacity,
                         pixelValuesToColorFn: function(values) {
                             var value = values[0];
         
@@ -508,12 +511,6 @@
                             // For risk zones, filter out values outside valid range (0-4)
                             if (layerId === 'risk' && (value < 0 || value > 4)) {
                                 return null;
-                            }
-                            
-                            // Special handling for risk zones - make low risk (value 0) more transparent
-                            if (layerId === 'risk' && value === 0) {
-                                // Return black with 40% opacity
-                                return 'rgba(0, 0, 0, 0.4)';
                             }
         
                             return scale(value).hex();
@@ -709,4 +706,3 @@
     </script>
 </body>
 </html>
-

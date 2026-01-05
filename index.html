@@ -7,7 +7,6 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-easyprint@2.1.9/dist/easyPrint.css" />
     
     <style>
         body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
@@ -72,15 +71,19 @@
             box-shadow: 0 0 15px rgba(0,0,0,0.2);
             max-height: 90vh;
             overflow-y: auto;
+            max-width: 220px;
         }
         
-        .layer-control h4 { margin: 0 0 10px; }
+        .layer-control h4 { 
+            margin: 0 0 10px; 
+            font-size: 14px;
+        }
         
         .layer-control label {
             display: block;
             margin: 8px 0;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
         }
         
         .layer-control input[type="radio"] {
@@ -99,7 +102,7 @@
         
         .layer-control .overlay-section h5 {
             margin: 0 0 8px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
         }
         
@@ -109,13 +112,19 @@
             border-top: 1px solid #ddd;
         }
         
+        .opacity-section h5 {
+            margin: 0 0 8px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
         .opacity-control {
             margin-bottom: 12px;
         }
         
         .opacity-control label {
             display: block;
-            font-size: 12px;
+            font-size: 11px;
             color: #666;
             margin-bottom: 4px;
         }
@@ -132,33 +141,7 @@
             float: right;
             font-weight: bold;
             color: #333;
-        }
-        
-        .swipe-section {
-            margin-top: 15px;
-            padding-top: 10px;
-            border-top: 1px solid #ddd;
-        }
-        
-        .swipe-section button {
-            width: 100%;
-            padding: 8px;
-            margin-top: 5px;
-            background: #1e88e5;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-        
-        .swipe-section button:hover {
-            background: #1565c0;
-        }
-        
-        .swipe-section button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
+            font-size: 11px;
         }
         
         .loading {
@@ -265,27 +248,6 @@
             border-right: 8px solid transparent;
             border-bottom: 12px solid #c30b0b;
         }
-        
-        /* Layer Swipe */
-        .leaflet-sbs-range {
-            position: absolute;
-            top: 50%;
-            width: 100%;
-            z-index: 999;
-        }
-        
-        .leaflet-sbs-divider {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 50%;
-            margin-left: -2px;
-            width: 4px;
-            background-color: #fff;
-            pointer-events: none;
-            z-index: 999;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-        }
     </style>
 </head>
 <body>
@@ -302,8 +264,6 @@
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-    <script src="https://unpkg.com/leaflet-easyprint@2.1.9/dist/bundle.js"></script>
-    <script src="https://unpkg.com/[email protected]/layout-bin-packing.js"></script>
 
     <script>
         // Initialize map
@@ -340,7 +300,6 @@
         var totalLayers = 3;
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
-        var swipeControl = null;
 
         // Layer configurations
         var layerConfigs = {
@@ -440,17 +399,6 @@
             
             drawnItems.addLayer(layer);
         });
-
-        // Add print/export control
-        L.easyPrint({
-            title: 'Export Map',
-            position: 'topright',
-            exportOnly: true,
-            sizeModes: ['A4Portrait', 'A4Landscape'],
-            filename: 'madagascar_plague_map',
-            hideControlContainer: false,
-            hideClasses: ['leaflet-control-zoom', 'leaflet-control-easyPrint']
-        }).addTo(map);
 
         // Function to copy coordinates to clipboard
         function copyCoordinatesToClipboard(lat, lng) {
@@ -647,100 +595,6 @@
             }
         }
 
-        // Layer swipe functionality
-        function enableLayerSwipe(leftLayerId, rightLayerId) {
-            if (swipeControl) {
-                disableLayerSwipe();
-            }
-            
-            if (!layers[leftLayerId] || !layers[rightLayerId]) {
-                alert('Both layers must be loaded to use swipe tool');
-                return;
-            }
-            
-            // Remove all layers first
-            Object.keys(layers).forEach(function(key) {
-                map.removeLayer(layers[key]);
-            });
-            
-            // Add both layers
-            layers[leftLayerId].addTo(map);
-            layers[rightLayerId].addTo(map);
-            
-            // Create swipe control
-            var range = document.createElement('input');
-            range.type = 'range';
-            range.min = 0;
-            range.max = 1;
-            range.step = 0.01;
-            range.value = 0.5;
-            range.className = 'leaflet-sbs-range';
-            
-            var divider = document.createElement('div');
-            divider.className = 'leaflet-sbs-divider';
-            
-            map.getContainer().appendChild(range);
-            map.getContainer().appendChild(divider);
-            
-            var leftLayer = layers[leftLayerId].getContainer();
-            var rightLayer = layers[rightLayerId].getContainer();
-            
-            function updateClip() {
-                var clipX = range.value * 100;
-                var containerWidth = map.getSize().x;
-                divider.style.left = clipX + '%';
-                
-                if (leftLayer) {
-                    leftLayer.style.clip = 'rect(0px, ' + (clipX * containerWidth / 100) + 'px, ' + map.getSize().y + 'px, 0px)';
-                }
-                if (rightLayer) {
-                    rightLayer.style.clip = 'rect(0px, ' + containerWidth + 'px, ' + map.getSize().y + 'px, ' + (clipX * containerWidth / 100) + 'px)';
-                }
-            }
-            
-            range.addEventListener('input', updateClip);
-            map.on('move', updateClip);
-            
-            updateClip();
-            
-            swipeControl = {
-                range: range,
-                divider: divider,
-                updateClip: updateClip,
-                leftLayerId: leftLayerId,
-                rightLayerId: rightLayerId
-            };
-        }
-
-        function disableLayerSwipe() {
-            if (swipeControl) {
-                if (swipeControl.range && swipeControl.range.parentNode) {
-                    swipeControl.range.parentNode.removeChild(swipeControl.range);
-                }
-                if (swipeControl.divider && swipeControl.divider.parentNode) {
-                    swipeControl.divider.parentNode.removeChild(swipeControl.divider);
-                }
-                
-                map.off('move', swipeControl.updateClip);
-                
-                // Remove clip styling
-                Object.keys(layers).forEach(function(key) {
-                    var container = layers[key].getContainer();
-                    if (container) {
-                        container.style.clip = 'auto';
-                    }
-                    map.removeLayer(layers[key]);
-                });
-                
-                // Re-add current layer
-                if (currentLayer && layers[currentLayer]) {
-                    layers[currentLayer].addTo(map);
-                }
-                
-                swipeControl = null;
-            }
-        }
-
         function loadLayer(layerId) {
             var config = layerConfigs[layerId];
             
@@ -820,10 +674,6 @@
         }
 
         function switchLayer(layerId) {
-            if (swipeControl) {
-                disableLayerSwipe();
-            }
-            
             if (currentLayer && layers[currentLayer]) {
                 map.removeLayer(layers[currentLayer]);
             }
@@ -916,12 +766,12 @@
             div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">High-Risk Regions</label>';
             div.innerHTML += '</div>';
             
-            // Opacity sliders section - all default to 100%
+            // Opacity sliders section
             div.innerHTML += '<div class="opacity-section">';
             div.innerHTML += '<h5>Layer Opacity</h5>';
             
             Object.keys(layerConfigs).forEach(function(key) {
-                var defaultOpacity = 1.0; // All layers default to 100%
+                var defaultOpacity = 1.0;
                 div.innerHTML += 
                     '<div class="opacity-control">' +
                     '<label>' + layerConfigs[key].name + ' <span class="opacity-value" id="opacity-value-' + key + '">' + Math.round(defaultOpacity * 100) + '%</span></label>' +
@@ -930,15 +780,6 @@
                     '</div>';
             });
             
-            div.innerHTML += '</div>';
-            
-            // Layer swipe section
-            div.innerHTML += '<div class="swipe-section">';
-            div.innerHTML += '<h5>Layer Comparison</h5>';
-            div.innerHTML += '<button onclick="enableLayerSwipe(\'enm\', \'risk\')">Compare ENM vs Risk Zones</button>';
-            div.innerHTML += '<button onclick="enableLayerSwipe(\'risk\', \'hotspot\')">Compare Risk vs Hotspot</button>';
-            div.innerHTML += '<button onclick="enableLayerSwipe(\'enm\', \'hotspot\')">Compare ENM vs Hotspot</button>';
-            div.innerHTML += '<button onclick="disableLayerSwipe()">Disable Swipe Tool</button>';
             div.innerHTML += '</div>';
             
             return div;
@@ -991,3 +832,4 @@
     </script>
 </body>
 </html>
+

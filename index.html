@@ -198,11 +198,19 @@
         map.createPane('boundariesPane');
         map.getPane('boundariesPane').style.zIndex = 350; // Above rasters, below overlays (plague cases)
 
-        // Add Esri Street Map basemap
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        // Define basemaps
+        var streetMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles © Esri',
             maxZoom: 19
-        }).addTo(map);
+        });
+
+        var satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles © Esri',
+            maxZoom: 19
+        });
+
+        // Add default basemap (Street Map)
+        streetMap.addTo(map);
 
         // Store layers
         var layers = {};
@@ -446,6 +454,20 @@
             }
         }
 
+        // Switch basemap function
+        function switchBasemap(basemapType) {
+            // Remove all basemaps
+            map.removeLayer(streetMap);
+            map.removeLayer(satelliteMap);
+            
+            // Add selected basemap
+            if (basemapType === 'street') {
+                streetMap.addTo(map);
+            } else if (basemapType === 'satellite') {
+                satelliteMap.addTo(map);
+            }
+        }
+
         // Load a layer
         function loadLayer(layerId) {
             var config = layerConfigs[layerId];
@@ -605,7 +627,14 @@
         var layerControl = L.control({position: 'topleft'});
         layerControl.onAdd = function (map) {
             var div = L.DomUtil.create('div', 'layer-control');
-            div.innerHTML = '<h4>Base Layers</h4>';
+            
+            // Basemap section
+            div.innerHTML = '<h4>Basemaps</h4>';
+            div.innerHTML += '<label><input type="radio" name="basemap" value="street" checked onchange="switchBasemap(\'street\')">Street Map</label>';
+            div.innerHTML += '<label><input type="radio" name="basemap" value="satellite" onchange="switchBasemap(\'satellite\')">Satellite Imagery</label>';
+            
+            // Risk layers section
+            div.innerHTML += '<h4 style="margin-top:15px; padding-top:10px; border-top: 1px solid #ddd;">Risk Layers</h4>';
             
             Object.keys(layerConfigs).forEach(function(key, index) {
                 var checked = index === 0 ? 'checked' : '';
@@ -674,4 +703,3 @@
     </script>
 </body>
 </html>
-

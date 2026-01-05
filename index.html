@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-easyprint@2.1.9/dist/easyPrint.css" />
     
     <style>
         body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
@@ -68,6 +70,8 @@
             padding: 10px;
             border-radius: 5px;
             box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            max-height: 90vh;
+            overflow-y: auto;
         }
         
         .layer-control h4 { margin: 0 0 10px; }
@@ -97,6 +101,64 @@
             margin: 0 0 8px;
             font-size: 13px;
             font-weight: bold;
+        }
+        
+        .opacity-section {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+        
+        .opacity-control {
+            margin-bottom: 12px;
+        }
+        
+        .opacity-control label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        
+        .opacity-control input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .opacity-value {
+            float: right;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .swipe-section {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+        
+        .swipe-section button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            background: #1e88e5;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        
+        .swipe-section button:hover {
+            background: #1565c0;
+        }
+        
+        .swipe-section button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
         
         .loading {
@@ -169,6 +231,61 @@
         .copy-notification.show {
             opacity: 1;
         }
+        
+        /* North Arrow */
+        .north-arrow {
+            position: absolute;
+            bottom: 30px;
+            left: 10px;
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #c30b0b;
+        }
+        
+        .north-arrow::before {
+            content: "N";
+        }
+        
+        .north-arrow::after {
+            content: "";
+            position: absolute;
+            top: 8px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 12px solid #c30b0b;
+        }
+        
+        /* Layer Swipe */
+        .leaflet-sbs-range {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            z-index: 999;
+        }
+        
+        .leaflet-sbs-divider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            margin-left: -2px;
+            width: 4px;
+            background-color: #fff;
+            pointer-events: none;
+            z-index: 999;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
     </style>
 </head>
 <body>
@@ -177,12 +294,16 @@
         <div id="load-status" style="margin-top: 10px; font-size: 12px;"></div>
     </div>
     <div id="map"></div>
+    <div class="north-arrow"></div>
     <div id="copy-notification" class="copy-notification"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/leaflet-easyprint@2.1.9/dist/bundle.js"></script>
+    <script src="https://unpkg.com/[email protected]/layout-bin-packing.js"></script>
 
     <script>
         // Initialize map
@@ -190,13 +311,13 @@
 
         // Create custom panes with specific z-index ordering
         map.createPane('backgroundPane');
-        map.getPane('backgroundPane').style.zIndex = 250; // Below raster layers
+        map.getPane('backgroundPane').style.zIndex = 250;
         
         map.createPane('rasterPane');
-        map.getPane('rasterPane').style.zIndex = 300; // Above background, below overlays
+        map.getPane('rasterPane').style.zIndex = 300;
         
         map.createPane('boundariesPane');
-        map.getPane('boundariesPane').style.zIndex = 350; // Above rasters, below overlays (plague cases)
+        map.getPane('boundariesPane').style.zIndex = 350;
 
         // Define basemaps
         var streetMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
@@ -219,6 +340,7 @@
         var totalLayers = 3;
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
+        var swipeControl = null;
 
         // Layer configurations
         var layerConfigs = {
@@ -261,25 +383,90 @@
             }
         };
 
+        // Add measurement tools
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        var drawControl = new L.Control.Draw({
+            position: 'topright',
+            draw: {
+                polyline: {
+                    shapeOptions: {
+                        color: '#f357a1',
+                        weight: 3
+                    },
+                    metric: true,
+                    feet: false,
+                    showLength: true
+                },
+                polygon: {
+                    shapeOptions: {
+                        color: '#f357a1',
+                        weight: 3
+                    },
+                    showArea: true,
+                    metric: true
+                },
+                circle: false,
+                rectangle: false,
+                marker: false,
+                circlemarker: false
+            },
+            edit: {
+                featureGroup: drawnItems,
+                remove: true
+            }
+        });
+        map.addControl(drawControl);
+
+        // Handle drawn shapes
+        map.on(L.Draw.Event.CREATED, function (event) {
+            var layer = event.layer;
+            var type = event.layerType;
+            
+            if (type === 'polyline') {
+                var length = 0;
+                var latlngs = layer.getLatLngs();
+                for (var i = 0; i < latlngs.length - 1; i++) {
+                    length += latlngs[i].distanceTo(latlngs[i + 1]);
+                }
+                var lengthKm = (length / 1000).toFixed(2);
+                layer.bindPopup('<b>Distance:</b> ' + lengthKm + ' km');
+            } else if (type === 'polygon') {
+                var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+                var areaKm = (area / 1000000).toFixed(2);
+                layer.bindPopup('<b>Area:</b> ' + areaKm + ' km²');
+            }
+            
+            drawnItems.addLayer(layer);
+        });
+
+        // Add print/export control
+        L.easyPrint({
+            title: 'Export Map',
+            position: 'topright',
+            exportOnly: true,
+            sizeModes: ['A4Portrait', 'A4Landscape'],
+            filename: 'madagascar_plague_map',
+            hideControlContainer: false,
+            hideClasses: ['leaflet-control-zoom', 'leaflet-control-easyPrint']
+        }).addTo(map);
+
         // Function to copy coordinates to clipboard
         function copyCoordinatesToClipboard(lat, lng) {
             var coordText = lat.toFixed(6) + ', ' + lng.toFixed(6);
             
-            // Try to use the modern clipboard API
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(coordText).then(function() {
                     showCopyNotification('Coordinates copied: ' + coordText);
                 }).catch(function(err) {
-                    // Fallback method
                     fallbackCopyTextToClipboard(coordText);
                 });
             } else {
-                // Fallback for older browsers
                 fallbackCopyTextToClipboard(coordText);
             }
         }
 
-        // Fallback copy method for older browsers
         function fallbackCopyTextToClipboard(text) {
             var textArea = document.createElement("textarea");
             textArea.value = text;
@@ -303,7 +490,6 @@
             document.body.removeChild(textArea);
         }
 
-        // Show notification when coordinates are copied
         function showCopyNotification(message, isError) {
             var notification = document.getElementById('copy-notification');
             notification.textContent = message;
@@ -315,7 +501,6 @@
             }, 2000);
         }
 
-        // Update loading status
         function updateStatus(message, isError) {
             var statusDiv = document.getElementById('load-status');
             if (isError) {
@@ -324,6 +509,13 @@
                 statusDiv.innerHTML += '<div>' + message + '</div>';
             }
             console.log(message);
+        }
+
+        // Update layer opacity
+        function updateLayerOpacity(layerId, opacity) {
+            if (layers[layerId]) {
+                layers[layerId].setOpacity(opacity);
+            }
         }
 
         // Load plague cases from GeoJSON
@@ -350,14 +542,11 @@
                             });
                         },
                         onEachFeature: function(feature, layer) {
-                            // Create popup content with all attributes
                             var popupContent = '<h3>Plague Case</h3><table>';
                             
-                            // Loop through all properties
                             for (var key in feature.properties) {
                                 if (feature.properties.hasOwnProperty(key)) {
                                     var value = feature.properties[key];
-                                    // Format the key to be more readable
                                     var displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, function(l){ return l.toUpperCase() });
                                     popupContent += '<tr><td>' + displayKey + '</td><td>' + value + '</td></tr>';
                                 }
@@ -372,7 +561,6 @@
                         }
                     });
                     
-                    // Add to map by default
                     plagueCasesLayer.addTo(map);
                 })
                 .catch(error => {
@@ -381,7 +569,6 @@
                 });
         }
 
-        // Toggle plague cases layer
         function togglePlagueCases(show) {
             if (plagueCasesLayer) {
                 if (show) {
@@ -392,10 +579,8 @@
             }
         }
 
-        // Update high-risk boundary style based on current layer
         function updateHighRiskBoundaryStyle() {
             if (highRiskBoundariesLayer) {
-                // Black boundaries for hotspot layer, white for others
                 var boundaryColor = (currentLayer === 'hotspot') ? '#000000' : '#FFFFFF';
                 
                 highRiskBoundariesLayer.setStyle({
@@ -408,7 +593,6 @@
             }
         }
 
-        // Load high risk boundaries
         function loadHighRiskBoundaries() {
             fetch('high_risk_boundaries.geojson')
                 .then(response => {
@@ -420,7 +604,6 @@
                 .then(data => {
                     updateStatus('Loaded high risk boundaries');
                     
-                    // Initial color based on current layer (white by default, black if hotspot)
                     var initialColor = (currentLayer === 'hotspot') ? '#000000' : '#FFFFFF';
                     
                     highRiskBoundariesLayer = L.geoJSON(data, {
@@ -431,8 +614,8 @@
                             weight: 2,
                             opacity: 1
                         },
-                        interactive: false,  // Make non-clickable
-                        pane: 'boundariesPane'  // Use custom pane below overlays
+                        interactive: false,
+                        pane: 'boundariesPane'
                     });
                     
                     highRiskBoundariesLayer.addTo(map);
@@ -443,7 +626,6 @@
                 });
         }
 
-        // Toggle high risk boundaries layer
         function toggleHighRiskBoundaries(show) {
             if (highRiskBoundariesLayer) {
                 if (show) {
@@ -454,13 +636,10 @@
             }
         }
 
-        // Switch basemap function
         function switchBasemap(basemapType) {
-            // Remove all basemaps
             map.removeLayer(streetMap);
             map.removeLayer(satelliteMap);
             
-            // Add selected basemap
             if (basemapType === 'street') {
                 streetMap.addTo(map);
             } else if (basemapType === 'satellite') {
@@ -468,7 +647,100 @@
             }
         }
 
-        // Load a layer
+        // Layer swipe functionality
+        function enableLayerSwipe(leftLayerId, rightLayerId) {
+            if (swipeControl) {
+                disableLayerSwipe();
+            }
+            
+            if (!layers[leftLayerId] || !layers[rightLayerId]) {
+                alert('Both layers must be loaded to use swipe tool');
+                return;
+            }
+            
+            // Remove all layers first
+            Object.keys(layers).forEach(function(key) {
+                map.removeLayer(layers[key]);
+            });
+            
+            // Add both layers
+            layers[leftLayerId].addTo(map);
+            layers[rightLayerId].addTo(map);
+            
+            // Create swipe control
+            var range = document.createElement('input');
+            range.type = 'range';
+            range.min = 0;
+            range.max = 1;
+            range.step = 0.01;
+            range.value = 0.5;
+            range.className = 'leaflet-sbs-range';
+            
+            var divider = document.createElement('div');
+            divider.className = 'leaflet-sbs-divider';
+            
+            map.getContainer().appendChild(range);
+            map.getContainer().appendChild(divider);
+            
+            var leftLayer = layers[leftLayerId].getContainer();
+            var rightLayer = layers[rightLayerId].getContainer();
+            
+            function updateClip() {
+                var clipX = range.value * 100;
+                var containerWidth = map.getSize().x;
+                divider.style.left = clipX + '%';
+                
+                if (leftLayer) {
+                    leftLayer.style.clip = 'rect(0px, ' + (clipX * containerWidth / 100) + 'px, ' + map.getSize().y + 'px, 0px)';
+                }
+                if (rightLayer) {
+                    rightLayer.style.clip = 'rect(0px, ' + containerWidth + 'px, ' + map.getSize().y + 'px, ' + (clipX * containerWidth / 100) + 'px)';
+                }
+            }
+            
+            range.addEventListener('input', updateClip);
+            map.on('move', updateClip);
+            
+            updateClip();
+            
+            swipeControl = {
+                range: range,
+                divider: divider,
+                updateClip: updateClip,
+                leftLayerId: leftLayerId,
+                rightLayerId: rightLayerId
+            };
+        }
+
+        function disableLayerSwipe() {
+            if (swipeControl) {
+                if (swipeControl.range && swipeControl.range.parentNode) {
+                    swipeControl.range.parentNode.removeChild(swipeControl.range);
+                }
+                if (swipeControl.divider && swipeControl.divider.parentNode) {
+                    swipeControl.divider.parentNode.removeChild(swipeControl.divider);
+                }
+                
+                map.off('move', swipeControl.updateClip);
+                
+                // Remove clip styling
+                Object.keys(layers).forEach(function(key) {
+                    var container = layers[key].getContainer();
+                    if (container) {
+                        container.style.clip = 'auto';
+                    }
+                    map.removeLayer(layers[key]);
+                });
+                
+                // Re-add current layer
+                if (currentLayer && layers[currentLayer]) {
+                    layers[currentLayer].addTo(map);
+                }
+                
+                swipeControl = null;
+            }
+        }
+
         function loadLayer(layerId) {
             var config = layerConfigs[layerId];
             
@@ -489,13 +761,12 @@
                 .then(georaster => {
                     updateStatus(config.name + ' parsed successfully');
                     
-                    // Create color scale with optional mode parameter for smoother gradients
                     var scale = config.mode 
                         ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
                         : chroma.scale(config.colors).domain(config.domain);
                     
-                    // Set opacity based on layer type - risk zones get 0.4, others get 0.75
-                    var layerOpacity = (layerId === 'risk') ? 0.4 : 0.75;
+                    // All layers default to 100% opacity
+                    var layerOpacity = 1.0;
                     
                     var layer = new GeoRasterLayer({
                         georaster: georaster,
@@ -503,12 +774,10 @@
                         pixelValuesToColorFn: function(values) {
                             var value = values[0];
         
-                            // Handle null/undefined/NaN values
                             if (value === null || value === undefined || isNaN(value)) {
                                 return null;
                             }
         
-                            // For risk zones, filter out values outside valid range (0-4)
                             if (layerId === 'risk' && (value < 0 || value > 4)) {
                                 return null;
                             }
@@ -524,16 +793,14 @@
                     
                     updateStatus(config.name + ' ready! (' + loadedCount + '/' + totalLayers + ')');
                     
-                    // If this is the first layer loaded, show it and fit bounds
                     if (!currentLayer) {
                         layer.addTo(map);
                         currentLayer = layerId;
                         map.fitBounds(layer.getBounds());
                         updateLegend(layerId);
-                        updateHighRiskBoundaryStyle(); // Update boundary color
+                        updateHighRiskBoundaryStyle();
                     }
                     
-                    // Hide loading screen when all layers are loaded
                     if (loadedCount === totalLayers) {
                         setTimeout(function() {
                             document.getElementById('loading').style.display = 'none';
@@ -545,7 +812,6 @@
                     updateStatus(errorMsg, true);
                     console.error(errorMsg, error);
                     
-                    // Show specific CORS error message
                     if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
                         updateStatus('⚠️ CORS Error: You must serve files through a web server!', true);
                         updateStatus('Try using: R servr::httd() or Python http.server', true);
@@ -553,8 +819,11 @@
                 });
         }
 
-        // Switch between layers
         function switchLayer(layerId) {
+            if (swipeControl) {
+                disableLayerSwipe();
+            }
+            
             if (currentLayer && layers[currentLayer]) {
                 map.removeLayer(layers[currentLayer]);
             }
@@ -563,27 +832,23 @@
                 layers[layerId].addTo(map);
                 currentLayer = layerId;
                 updateLegend(layerId);
-                updateHighRiskBoundaryStyle(); // Update boundary color when switching layers
+                updateHighRiskBoundaryStyle();
             }
         }
 
-        // Update legend
         function updateLegend(layerId) {
             var config = layerConfigs[layerId];
             var legendDiv = document.getElementById('legend-content');
             
             legendDiv.innerHTML = '<h4>' + config.name + '</h4>';
             
-            // Check if this layer has a custom legend
             if (config.customLegend && config.legendItems) {
-                // Use custom legend items
                 config.legendItems.forEach(function(item) {
                     legendDiv.innerHTML +=
                         '<div class="item"><i style="background:' + item.color + '"></i> ' +
                         item.label + '</div>';
                 });
             } else if (config.continuousLegend) {
-                // Create horizontal continuous gradient legend
                 var gradientStops = [];
                 for (var i = 0; i < config.colors.length; i++) {
                     var percentage = (i / (config.colors.length - 1)) * 100;
@@ -598,12 +863,10 @@
                     '<span>' + config.labels[1] + '</span>' +
                     '</div>';
             } else {
-                // Use automatic discrete legend generation
                 var numGrades = 5;
                 var range = config.domain[1] - config.domain[0];
                 var step = range / numGrades;
                 
-                // Create color scale with optional mode parameter
                 var scale = config.mode 
                     ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
                     : chroma.scale(config.colors).domain(config.domain);
@@ -619,7 +882,6 @@
                 }
             }
             
-            // Only add description if it's not empty
             if (config.description) {
                 legendDiv.innerHTML += '<p style="margin-top:10px; font-size:11px; color:#777;">' + 
                                        config.description + '</p>';
@@ -647,11 +909,36 @@
                     layerConfigs[key].name + '</label>';
             });
             
-            // Add overlay section
+            // Overlay section
             div.innerHTML += '<div class="overlay-section">';
             div.innerHTML += '<h5>Overlays</h5>';
             div.innerHTML += '<label><input type="checkbox" id="plague-cases-toggle" checked onchange="togglePlagueCases(this.checked)">Plague Cases</label>';
             div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">High-Risk Regions</label>';
+            div.innerHTML += '</div>';
+            
+            // Opacity sliders section - all default to 100%
+            div.innerHTML += '<div class="opacity-section">';
+            div.innerHTML += '<h5>Layer Opacity</h5>';
+            
+            Object.keys(layerConfigs).forEach(function(key) {
+                var defaultOpacity = 1.0; // All layers default to 100%
+                div.innerHTML += 
+                    '<div class="opacity-control">' +
+                    '<label>' + layerConfigs[key].name + ' <span class="opacity-value" id="opacity-value-' + key + '">' + Math.round(defaultOpacity * 100) + '%</span></label>' +
+                    '<input type="range" id="opacity-' + key + '" min="0" max="100" value="' + (defaultOpacity * 100) + '" ' +
+                    'oninput="updateLayerOpacity(\'' + key + '\', this.value/100); document.getElementById(\'opacity-value-' + key + '\').textContent = this.value + \'%\'">' +
+                    '</div>';
+            });
+            
+            div.innerHTML += '</div>';
+            
+            // Layer swipe section
+            div.innerHTML += '<div class="swipe-section">';
+            div.innerHTML += '<h5>Layer Comparison</h5>';
+            div.innerHTML += '<button onclick="enableLayerSwipe(\'enm\', \'risk\')">Compare ENM vs Risk Zones</button>';
+            div.innerHTML += '<button onclick="enableLayerSwipe(\'risk\', \'hotspot\')">Compare Risk vs Hotspot</button>';
+            div.innerHTML += '<button onclick="enableLayerSwipe(\'enm\', \'hotspot\')">Compare ENM vs Hotspot</button>';
+            div.innerHTML += '<button onclick="disableLayerSwipe()">Disable Swipe Tool</button>';
             div.innerHTML += '</div>';
             
             return div;
@@ -675,7 +962,8 @@
                 '<h4>Plague Risk Mapping - Madagascar</h4>' +
                 '<p>Select a layer to view different risk assessments.</p> ' +
                 '<p><em>Click plague case markers for details</em></p>' +
-                '<p><em>Right-click map to copy coordinates</em></p>';
+                '<p><em>Right-click map to copy coordinates</em></p>' +
+                '<p><em>Use drawing tools to measure distance/area</em></p>';
             return div;
         };
         info.addTo(map);
@@ -698,10 +986,7 @@
             loadLayer(key);
         });
         
-        // Load plague cases
         loadPlagueCases();
-        
-        // Load high risk boundaries
         loadHighRiskBoundaries();
     </script>
 </body>

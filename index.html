@@ -281,8 +281,8 @@
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
     <script>
-        // Initialize map - centered on Antananarivo region (central Madagascar)
-        var map = L.map('map').setView([-18.9, 47.52], 9);
+        // Initialize map - centered on Antananarivo region (central Madagascar) with zoom 12
+        var map = L.map('map').setView([-18.9, 47.52], 12);
 
         // Create custom panes with specific z-index ordering
         map.createPane('backgroundPane');
@@ -637,8 +637,8 @@
                         ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
                         : chroma.scale(config.colors).domain(config.domain);
                     
-                    // Set default opacity: ENM = 0.5 (50%), others = 1.0 (100%)
-                    var layerOpacity = (layerId === 'enm') ? 0.5 : 1.0;
+                    // Set default opacity: ENM and Risk = 0.5 (50%), Hotspot = 1.0 (100%)
+                    var layerOpacity = (layerId === 'enm' || layerId === 'risk') ? 0.5 : 1.0;
                     
                     var layer = new GeoRasterLayer({
                         georaster: georaster,
@@ -754,11 +754,10 @@
                                        config.description + '</p>';
             }
             
-            // Add plague cases legend section if plague cases are loaded
+            // Add plague cases legend section if plague cases are loaded (without "Overlays" heading)
             if (plagueCasesLayer) {
                 legendDiv.innerHTML += 
                     '<div class="plague-cases-section">' +
-                    '<h4 style="font-size:13px;">Overlays</h4>' +
                     '<div class="item">' +
                     '<span class="plague-case-symbol">✚</span>' +
                     '<span style="font-size:11px;">Plague Cases</span>' +
@@ -795,12 +794,12 @@
             div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">High-Risk Regions</label>';
             div.innerHTML += '</div>';
             
-            // Opacity sliders section - ENM defaults to 50%, others to 100%
+            // Opacity sliders section - ENM and Risk default to 50%, Hotspot to 100%
             div.innerHTML += '<div class="opacity-section">';
             div.innerHTML += '<h5>Layer Opacity</h5>';
             
             Object.keys(layerConfigs).forEach(function(key) {
-                var defaultOpacity = (key === 'enm') ? 0.5 : 1.0;
+                var defaultOpacity = (key === 'enm' || key === 'risk') ? 0.5 : 1.0;
                 div.innerHTML += 
                     '<div class="opacity-control">' +
                     '<label>' + layerConfigs[key].name + ' <span class="opacity-value" id="opacity-value-' + key + '">' + Math.round(defaultOpacity * 100) + '%</span></label>' +
@@ -840,7 +839,7 @@
 
         // Add right-click handler to copy coordinates
         map.on('contextmenu', function(e) {
-            copyCoordinatesToClipboard(e.latlng.at, e.latlng.lng);
+            copyCoordinatesToClipboard(e.latlng.lat, e.latlng.lng);
         });
 
         // Add click handler to show values
@@ -861,3 +860,4 @@
     </script>
 </body>
 </html>
+

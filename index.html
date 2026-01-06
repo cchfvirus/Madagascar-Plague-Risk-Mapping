@@ -281,7 +281,7 @@
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
     <script>
-        // Initialize map - centered on Antananarivo region (central Madagascar) with zoom 12
+        // Initialize map - centered on Antananarivo region (central Madagascar) with zoom 10
         var map = L.map('map').setView([-18.9, 47.52], 10);
 
         // Create custom panes with specific z-index ordering
@@ -547,7 +547,8 @@
 
         function updateHighRiskBoundaryStyle() {
             if (highRiskBoundariesLayer) {
-                var boundaryColor = (currentLayer === 'hotspot') ? '#000000' : '#FFFFFF';
+                // Black boundaries for ENM and Hotspot layers, white for Risk layer
+                var boundaryColor = (currentLayer === 'hotspot' || currentLayer === 'enm') ? '#000000' : '#FFFFFF';
                 
                 highRiskBoundariesLayer.setStyle({
                     fillColor: 'transparent',
@@ -570,7 +571,8 @@
                 .then(data => {
                     updateStatus('Loaded high risk boundaries');
                     
-                    var initialColor = (currentLayer === 'hotspot') ? '#000000' : '#FFFFFF';
+                    // Initial color based on current layer (black for ENM and hotspot, white for risk)
+                    var initialColor = (currentLayer === 'hotspot' || currentLayer === 'enm') ? '#000000' : '#FFFFFF';
                     
                     highRiskBoundariesLayer = L.geoJSON(data, {
                         style: {
@@ -860,5 +862,3 @@
     </script>
 </body>
 </html>
-
-

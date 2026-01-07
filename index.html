@@ -332,13 +332,27 @@
             'risk': {
                 file: 'risk_zones_cog.tif',
                 name: 'Risk Zones (100m)',
-                colors: ['#000000', '#FFFFBE', '#FFAA00', '#FF0000', '#A80000'],
-                domain: [1, 5],
-                labels: ['Low Risk', 'High Risk'],
+                discreteColors: {
+                    0: '#000000',  // Black - No risk/background
+                    1: '#FFFFBE',  // Light yellow - Very low risk
+                    2: '#FFDD00',  // Yellow - Low risk
+                    3: '#FFAA00',  // Orange - Moderate risk
+                    4: '#FF6600',  // Red-orange - Elevated risk
+                    6: '#FF0000',  // Red - High risk
+                    9: '#A80000'   // Dark red - Very high risk
+                },
+                labels: ['No Risk', 'Very High Risk'],
                 description: 'Plague Transmission Risk Zones',
-                continuousLegend: true,
-                minValue: 1,
-                maxValue: 5
+                customLegend: true,
+                legendItems: [
+                    { value: 0, color: '#000000', label: '0 - No Risk' },
+                    { value: 1, color: '#FFFFBE', label: '1 - Very Low Risk' },
+                    { value: 2, color: '#FFDD00', label: '2 - Low Risk' },
+                    { value: 3, color: '#FFAA00', label: '3 - Moderate Risk' },
+                    { value: 4, color: '#FF6600', label: '4 - Elevated Risk' },
+                    { value: 6, color: '#FF0000', label: '6 - High Risk' },
+                    { value: 9, color: '#A80000', label: '9 - Very High Risk' }
+                ]
             },
             'hotspot': {
                 file: 'hotspot_cog.tif',
@@ -699,10 +713,6 @@
                     // Store the georaster for value querying
                     georasters[layerId] = georaster;
                     
-                    var scale = config.mode 
-                        ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
-                        : chroma.scale(config.colors).domain(config.domain);
-                    
                     // Set default opacity: ENM and Risk = 0.5 (50%), Hotspot = 1.0 (100%)
                     var layerOpacity = (layerId === 'enm' || layerId === 'risk') ? 0.5 : 1.0;
                     
@@ -716,13 +726,21 @@
                                 return null;
                             }
                             
-                            // For risk layer, only show values within the valid range
-                            if (layerId === 'risk') {
-                                if (value < config.minValue || value > config.maxValue) {
-                                    return null;  // Make out-of-range values transparent
+                            // For risk layer with discrete colors
+                            if (config.discreteColors) {
+                                // Round value to nearest integer for discrete classification
+                                var intValue = Math.round(value);
+                                if (config.discreteColors.hasOwnProperty(intValue)) {
+                                    return config.discreteColors[intValue];
                                 }
+                                return null;  // Return null for values not in the discrete set
                             }
-        
+                            
+                            // For continuous layers (ENM, Hotspot)
+                            var scale = config.mode 
+                                ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
+                                : chroma.scale(config.colors).domain(config.domain);
+                            
                             return scale(value).hex();
                         },
                         resolution: 256,
@@ -922,7 +940,7 @@
             // Get value from the currently visible layer only
             var value = getRasterValueAtPoint(currentLayer, e.latlng);
             var config = layerConfigs[currentLayer];
-            var displayValue = value !== null ? value.toFixed(4) : 'No Data';
+            var displayValue = value !== null ? value.toFixed(0) : 'No Data';
             
             var popupContent = '<h3>' + config.name + '</h3><table>';
             popupContent += '<tr><td>Coordinates</td><td>' + e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6) + '</td></tr>';
@@ -946,3 +964,4 @@
     </script>
 </body>
 </html>
+

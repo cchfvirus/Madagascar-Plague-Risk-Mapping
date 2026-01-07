@@ -332,11 +332,13 @@
             'risk': {
                 file: 'risk_zones_cog.tif',
                 name: 'Risk Zones (100m)',
-                colors: ['#000000', '#666666', '#FFFFBE', '#FFDD00', '#FFAA00', '#FF0000', '#A80000'],
-                domain: [0, 6],
+                colors: ['#000000', '#FFFFBE', '#FFAA00', '#FF0000', '#A80000'],
+                domain: [1, 5],
                 labels: ['Low Risk', 'High Risk'],
                 description: 'Plague Transmission Risk Zones',
-                continuousLegend: true
+                continuousLegend: true,
+                minValue: 1,
+                maxValue: 5
             },
             'hotspot': {
                 file: 'hotspot_cog.tif',
@@ -712,6 +714,13 @@
         
                             if (value === null || value === undefined || isNaN(value)) {
                                 return null;
+                            }
+                            
+                            // For risk layer, only show values within the valid range
+                            if (layerId === 'risk') {
+                                if (value < config.minValue || value > config.maxValue) {
+                                    return null;  // Make out-of-range values transparent
+                                }
                             }
         
                             return scale(value).hex();

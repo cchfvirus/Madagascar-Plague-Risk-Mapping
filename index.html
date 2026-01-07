@@ -279,6 +279,7 @@
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/geoblaze@2.8.0/dist/geoblaze.min.js"></script>
 
     <script>
         // Initialize map - centered on Antananarivo region (central Madagascar) with zoom 10
@@ -308,8 +309,9 @@
         // Add default basemap (Street Map)
         streetMap.addTo(map);
 
-        // Store layers
+        // Store layers and georasters
         var layers = {};
+        var georasters = {};
         var currentLayer = null;
         var loadedCount = 0;
         var totalLayers = 3;
@@ -481,23 +483,15 @@
             }
         }
 
-        // Function to get raster value at a point
+        // Function to get raster value at a point using geoblaze
         function getRasterValueAtPoint(layerId, latlng) {
-            if (!layers[layerId]) {
+            if (!georasters[layerId]) {
                 return null;
             }
             
-            var layer = layers[layerId];
-            var georaster = layer.georasters[0];
-            
-            // Convert lat/lng to pixel coordinates
-            var x = latlng.lng;
-            var y = latlng.lat;
-            
-            // Get the value at the coordinates
             try {
-                var values = geoblaze.identify(georaster, [x, y]);
-                if (values && values.length > 0) {
+                var values = geoblaze.identify(georasters[layerId], [latlng.lng, latlng.lat]);
+                if (values && values.length > 0 && values[0] !== null && values[0] !== undefined) {
                     return values[0];
                 }
             } catch (error) {
@@ -660,6 +654,9 @@
                 })
                 .then(georaster => {
                     updateStatus(config.name + ' parsed successfully');
+                    
+                    // Store the georaster for value querying
+                    georasters[layerId] = georaster;
                     
                     var scale = config.mode 
                         ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
@@ -883,7 +880,7 @@
             
             // Get values from all three layers
             Object.keys(layerConfigs).forEach(function(key) {
-                if (layers[key]) {
+                if (georasters[key]) {
                     var value = getRasterValueAtPoint(key, e.latlng);
                     var displayValue = value !== null ? value.toFixed(4) : 'No Data';
                     popupContent += '<tr><td>' + layerConfigs[key].name + '</td><td>' + displayValue + '</td></tr>';

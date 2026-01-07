@@ -279,7 +279,6 @@
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-    <script src="https://unpkg.com/geoblaze@2.8.0/dist/geoblaze.min.js"></script>
 
     <script>
         // Initialize map - centered on Antananarivo region (central Madagascar) with zoom 10
@@ -483,16 +482,57 @@
             }
         }
 
-        // Function to get raster value at a point using geoblaze
+        // Function to get raster value at a point
         function getRasterValueAtPoint(layerId, latlng) {
             if (!georasters[layerId]) {
                 return null;
             }
             
             try {
-                var values = geoblaze.identify(georasters[layerId], [latlng.lng, latlng.lat]);
-                if (values && values.length > 0 && values[0] !== null && values[0] !== undefined) {
-                    return values[0];
+                var georaster = georasters[layerId];
+                var x = latlng.lng;
+                var y = latlng.lat;
+                
+                // Get georaster bounds
+                var xmin = georaster.xmin;
+                var xmax = georaster.xmax;
+                var ymin = georaster.ymin;
+                var ymax = georaster.ymax;
+                var width = georaster.width;
+                var height = georaster.height;
+                
+                // Check if point is within bounds
+                if (x < xmin || x > xmax || y < ymin || y > ymax) {
+                    return null;
+                }
+                
+                // Calculate pixel coordinates
+                var pixelWidth = (xmax - xmin) / width;
+                var pixelHeight = (ymax - ymin) / height;
+                
+                var pixelX = Math.floor((x - xmin) / pixelWidth);
+                var pixelY = Math.floor((ymax - y) / pixelHeight);
+                
+                // Make sure we're within the raster bounds
+                if (pixelX < 0 || pixelX >= width || pixelY < 0 || pixelY >= height) {
+                    return null;
+                }
+                
+                // Get the value from the raster
+                var values = georaster.values;
+                if (values && values[0]) {
+                    var index = pixelY * width + pixelX;
+                    var value = values[0][index];
+                    
+                    // Check for nodata value
+                    if (value !== null && value !== undefined && !isNaN(value)) {
+                        if (georaster.noDataValue !== null && georaster.noDataValue !== undefined) {
+                            if (value === georaster.noDataValue) {
+                                return null;
+                            }
+                        }
+                        return value;
+                    }
                 }
             } catch (error) {
                 console.log('Error getting value for ' + layerId + ':', error);
@@ -657,6 +697,16 @@
                     
                     // Store the georaster for value querying
                     georasters[layerId] = georaster;
+                    
+                    console.log('Georaster ' + layerId + ' info:', {
+                        width: georaster.width,
+                        height: georaster.height,
+                        xmin: georaster.xmin,
+                        xmax: georaster.xmax,
+                        ymin: georaster.ymin,
+                        ymax: georaster.ymax,
+                        noDataValue: georaster.noDataValue
+                    });
                     
                     var scale = config.mode 
                         ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)

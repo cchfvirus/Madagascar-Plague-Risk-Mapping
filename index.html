@@ -79,6 +79,17 @@
             vertical-align: middle;
         }
         
+        .legend .buffer-symbol {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: rgba(255, 69, 0, 0.2);
+            border: 2px solid #ff4500;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
         .layer-control {
             background: white;
             padding: 10px;
@@ -314,6 +325,7 @@
         var loadedCount = 0;
         var totalLayers = 3;
         var plagueCasesLayer = null;
+        var plagueBuffersLayer = null;
         var highRiskBoundariesLayer = null;
 
         // Layer configurations
@@ -493,6 +505,7 @@
                 .then(data => {
                     updateStatus('Loaded ' + data.features.length + ' plague cases');
                     
+                    // Create plague cases layer
                     plagueCasesLayer = L.geoJSON(data, {
                         pointToLayer: function(feature, latlng) {
                             return L.marker(latlng, {
@@ -524,6 +537,21 @@
                         }
                     });
                     
+                    // Create 50km buffer layer
+                    plagueBuffersLayer = L.featureGroup();
+                    data.features.forEach(function(feature) {
+                        var latlng = L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]);
+                        var circle = L.circle(latlng, {
+                            radius: 50000, // 50km in meters
+                            color: '#ff4500',
+                            weight: 2,
+                            fillColor: '#ff4500',
+                            fillOpacity: 0.1,
+                            interactive: false
+                        });
+                        plagueBuffersLayer.addLayer(circle);
+                    });
+                    
                     plagueCasesLayer.addTo(map);
                     
                     // Update legend to show plague cases
@@ -541,6 +569,16 @@
                     plagueCasesLayer.addTo(map);
                 } else {
                     map.removeLayer(plagueCasesLayer);
+                }
+            }
+        }
+
+        function togglePlagueBuffers(show) {
+            if (plagueBuffersLayer) {
+                if (show) {
+                    plagueBuffersLayer.addTo(map);
+                } else {
+                    map.removeLayer(plagueBuffersLayer);
                 }
             }
         }
@@ -756,13 +794,17 @@
                                        config.description + '</p>';
             }
             
-            // Add plague cases legend section if plague cases are loaded (without "Overlays" heading)
+            // Add plague cases and buffers legend section if plague cases are loaded
             if (plagueCasesLayer) {
                 legendDiv.innerHTML += 
                     '<div class="plague-cases-section">' +
                     '<div class="item">' +
                     '<span class="plague-case-symbol">✚</span>' +
                     '<span style="font-size:11px;">Plague Cases</span>' +
+                    '</div>' +
+                    '<div class="item">' +
+                    '<span class="buffer-symbol"></span>' +
+                    '<span style="font-size:11px;">50km Buffer</span>' +
                     '</div>' +
                     '</div>';
             }
@@ -793,6 +835,7 @@
             div.innerHTML += '<div class="overlay-section">';
             div.innerHTML += '<h5>Overlays</h5>';
             div.innerHTML += '<label><input type="checkbox" id="plague-cases-toggle" checked onchange="togglePlagueCases(this.checked)">Plague Cases</label>';
+            div.innerHTML += '<label><input type="checkbox" id="plague-buffers-toggle" onchange="togglePlagueBuffers(this.checked)">50km Buffers</label>';
             div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">High-Risk Regions</label>';
             div.innerHTML += '</div>';
             

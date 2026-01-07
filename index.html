@@ -332,8 +332,8 @@
             'risk': {
                 file: 'risk_zones_cog.tif',
                 name: 'Risk Zones (100m)',
-                colors: ['#000000', '#FFFFBE', '#FFAA00', '#FF0000', '#A80000'],
-                domain: [0, 4],
+                colors: ['#000000', '#2d2d2d', '#5a5a5a', '#878787', '#b4b4b4', '#FFFFBE', '#FFDD00', '#FFAA00', '#FF0000', '#A80000'],
+                domain: [0, 9],
                 labels: ['Low Risk', 'High Risk'],
                 description: 'Plague Transmission Risk Zones',
                 continuousLegend: true
@@ -482,7 +482,7 @@
             }
         }
 
-        // Function to get raster value at a point - FIXED for 2D array structure
+        // Function to get raster value at a point
         function getRasterValueAtPoint(layerId, latlng) {
             if (!georasters[layerId]) {
                 return null;
@@ -711,10 +711,6 @@
                             var value = values[0];
         
                             if (value === null || value === undefined || isNaN(value)) {
-                                return null;
-                            }
-        
-                            if (layerId === 'risk' && (value < 0 || value > 4)) {
                                 return null;
                             }
         

@@ -482,13 +482,9 @@
             }
         }
 
-        // Function to get raster value at a point with extensive debugging
+        // Function to get raster value at a point - FIXED for 2D array structure
         function getRasterValueAtPoint(layerId, latlng) {
-            console.log('=== Getting value for layer:', layerId);
-            console.log('Clicked coordinates:', latlng.lat, latlng.lng);
-            
             if (!georasters[layerId]) {
-                console.log('ERROR: Georaster not found for', layerId);
                 return null;
             }
             
@@ -496,13 +492,6 @@
                 var georaster = georasters[layerId];
                 var x = latlng.lng;
                 var y = latlng.lat;
-                
-                console.log('Georaster bounds:', {
-                    xmin: georaster.xmin,
-                    xmax: georaster.xmax,
-                    ymin: georaster.ymin,
-                    ymax: georaster.ymax
-                });
                 
                 // Get georaster bounds
                 var xmin = georaster.xmin;
@@ -514,7 +503,6 @@
                 
                 // Check if point is within bounds
                 if (x < xmin || x > xmax || y < ymin || y > ymax) {
-                    console.log('Point outside raster bounds');
                     return null;
                 }
                 
@@ -525,48 +513,28 @@
                 var pixelX = Math.floor((x - xmin) / pixelWidth);
                 var pixelY = Math.floor((ymax - y) / pixelHeight);
                 
-                console.log('Pixel coordinates:', pixelX, pixelY);
-                console.log('Raster dimensions:', width, 'x', height);
-                
                 // Make sure we're within the raster bounds
                 if (pixelX < 0 || pixelX >= width || pixelY < 0 || pixelY >= height) {
-                    console.log('Pixel coordinates out of bounds');
                     return null;
                 }
                 
-                // Get the value from the raster
+                // Get the value from the raster - values[0] is a 2D array [row][col]
                 var values = georaster.values;
-                console.log('Values array exists:', !!values);
-                console.log('Values[0] exists:', !!(values && values[0]));
-                
-                if (values && values[0]) {
-                    var index = pixelY * width + pixelX;
-                    console.log('Calculated index:', index);
-                    console.log('Array length:', values[0].length);
-                    
-                    var value = values[0][index];
-                    console.log('Raw value at index:', value);
-                    console.log('Value type:', typeof value);
-                    console.log('NoDataValue:', georaster.noDataValue);
+                if (values && values[0] && values[0][pixelY]) {
+                    var value = values[0][pixelY][pixelX];
                     
                     // Check for nodata value
                     if (value !== null && value !== undefined && !isNaN(value)) {
-                        if (georaster.noDataValue !== null && georaster.noDataValue !== undefined) {
-                            if (value === georaster.noDataValue) {
-                                console.log('Value matches noDataValue');
+                        if (georaster.noDataValue !== null && georaster.noDataValue !== undefined && !isNaN(georaster.noDataValue)) {
+                            if (Math.abs(value - georaster.noDataValue) < 0.0001) {
                                 return null;
                             }
                         }
-                        console.log('Returning value:', value);
                         return value;
-                    } else {
-                        console.log('Value is null, undefined, or NaN');
                     }
-                } else {
-                    console.log('ERROR: values array not structured as expected');
                 }
             } catch (error) {
-                console.log('ERROR in getRasterValueAtPoint:', error);
+                console.log('Error getting value for ' + layerId + ':', error);
             }
             
             return null;
@@ -728,19 +696,6 @@
                     
                     // Store the georaster for value querying
                     georasters[layerId] = georaster;
-                    
-                    console.log('Georaster ' + layerId + ' info:', {
-                        width: georaster.width,
-                        height: georaster.height,
-                        xmin: georaster.xmin,
-                        xmax: georaster.xmax,
-                        ymin: georaster.ymin,
-                        ymax: georaster.ymax,
-                        noDataValue: georaster.noDataValue,
-                        numberOfRasters: georaster.numberOfRasters,
-                        pixelWidth: georaster.pixelWidth,
-                        pixelHeight: georaster.pixelHeight
-                    });
                     
                     var scale = config.mode 
                         ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)

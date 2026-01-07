@@ -84,7 +84,7 @@
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            background: rgba(255, 69, 0, 0.2);
+            background: transparent;
             border: 2px solid #ff4500;
             margin-right: 8px;
             vertical-align: middle;
@@ -290,6 +290,7 @@
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 
     <script>
         // Initialize map - centered on Antananarivo region (central Madagascar) with zoom 10
@@ -537,19 +538,29 @@
                         }
                     });
                     
-                    // Create 50km buffer layer
-                    plagueBuffersLayer = L.featureGroup();
+                    // Create 50km buffers using Turf.js and dissolve them
+                    var buffers = [];
                     data.features.forEach(function(feature) {
-                        var latlng = L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]);
-                        var circle = L.circle(latlng, {
-                            radius: 50000, // 50km in meters
+                        var point = turf.point([feature.geometry.coordinates[0], feature.geometry.coordinates[1]]);
+                        var buffered = turf.buffer(point, 50, {units: 'kilometers'});
+                        buffers.push(buffered);
+                    });
+                    
+                    // Union/dissolve all buffers into one geometry
+                    var dissolved = buffers[0];
+                    for (var i = 1; i < buffers.length; i++) {
+                        dissolved = turf.union(dissolved, buffers[i]);
+                    }
+                    
+                    // Create the dissolved buffer layer with no fill (completely transparent)
+                    plagueBuffersLayer = L.geoJSON(dissolved, {
+                        style: {
                             color: '#ff4500',
                             weight: 2,
-                            fillColor: '#ff4500',
-                            fillOpacity: 0.1,
+                            fillColor: 'transparent',
+                            fillOpacity: 0,
                             interactive: false
-                        });
-                        plagueBuffersLayer.addLayer(circle);
+                        }
                     });
                     
                     plagueCasesLayer.addTo(map);

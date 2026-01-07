@@ -907,7 +907,7 @@
                 '<p>Select a layer to view different risk assessments.</p> ' +
                 '<p><em>Click plague case markers for details</em></p>' +
                 '<p><em>Right-click map to copy coordinates</em></p>' +
-                '<p><em>Left-click map to view cell values</em></p>' +
+                '<p><em>Left-click map to view cell value</em></p>' +
                 '<p><em>Use drawing tools to measure distance/area</em></p>';
             return div;
         };
@@ -918,25 +918,21 @@
             copyCoordinatesToClipboard(e.latlng.lat, e.latlng.lng);
         });
 
-        // Add left-click handler to show cell values from all layers
+        // Add left-click handler to show cell value from CURRENT layer only
         map.on('click', function(e) {
-            // Check if all layers are loaded
-            if (loadedCount < totalLayers) {
+            // Check if current layer is loaded
+            if (!currentLayer || !georasters[currentLayer]) {
                 return;
             }
             
-            var popupContent = '<h3>Cell Values</h3><table>';
+            // Get value from the currently visible layer only
+            var value = getRasterValueAtPoint(currentLayer, e.latlng);
+            var config = layerConfigs[currentLayer];
+            var displayValue = value !== null ? value.toFixed(4) : 'No Data';
+            
+            var popupContent = '<h3>' + config.name + '</h3><table>';
             popupContent += '<tr><td>Coordinates</td><td>' + e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6) + '</td></tr>';
-            
-            // Get values from all three layers
-            Object.keys(layerConfigs).forEach(function(key) {
-                if (georasters[key]) {
-                    var value = getRasterValueAtPoint(key, e.latlng);
-                    var displayValue = value !== null ? value.toFixed(4) : 'No Data';
-                    popupContent += '<tr><td>' + layerConfigs[key].name + '</td><td>' + displayValue + '</td></tr>';
-                }
-            });
-            
+            popupContent += '<tr><td>Cell Value</td><td>' + displayValue + '</td></tr>';
             popupContent += '</table>';
             
             L.popup()

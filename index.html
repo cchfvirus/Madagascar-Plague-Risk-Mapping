@@ -345,6 +345,7 @@
                 description: 'Plague Transmission Risk Zones',
                 customLegend: true,
                 discreteDisplay: true,
+                showCellBorders: true,  // Enable cell borders for 100m resolution
                 legendItems: [
                     { value: 0, color: '#000000', label: '0 - No Risk' },
                     { value: 1, color: '#FFFFBE', label: '1 - Very Low Risk' },
@@ -364,6 +365,7 @@
                 description: 'Getis-Ord Gi* statistic showing spatial clustering of plague risk',
                 customLegend: true,
                 discreteDisplay: true,
+                showCellBorders: true,  // Enable cell borders for 100m resolution
                 legendItems: [
                     { value: 2.58, color: '#ca0020', label: 'Hot Spot with 99% Confidence' },
                     { value: 1.96, color: '#f4a582', label: 'Hot Spot with 95% Confidence' },
@@ -773,9 +775,24 @@
                         georaster: georaster,
                         opacity: layerOpacity,
                         pixelValuesToColorFn: pixelValuesToColorFn,
-                        resolution: 256,
+                        resolution: config.showCellBorders ? 128 : 256,  // Lower resolution for bordered layers to show individual cells
                         pane: 'rasterPane'
                     });
+                    
+                    // Add cell border styling for 100m resolution layers
+                    if (config.showCellBorders) {
+                        layer.on('add', function() {
+                            setTimeout(function() {
+                                var canvas = layer.getContainer();
+                                if (canvas) {
+                                    canvas.style.imageRendering = 'pixelated';
+                                    canvas.style.imageRendering = '-moz-crisp-edges';
+                                    canvas.style.imageRendering = 'crisp-edges';
+                                    canvas.style.filter = 'drop-shadow(0.5px 0 0 rgba(0,0,0,0.15)) drop-shadow(0 0.5px 0 rgba(0,0,0,0.15))';
+                                }
+                            }, 100);
+                        });
+                    }
                     
                     layers[layerId] = layer;
                     loadedCount++;
@@ -1007,3 +1024,4 @@
     </script>
 </body>
 </html>
+

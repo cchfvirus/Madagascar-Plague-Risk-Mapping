@@ -316,6 +316,62 @@
         var totalLayers = 3;
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
+        var gridOverlay = null;
+
+        // Custom grid overlay class for 100m cell boundaries
+        L.GridLayer.GridOverlay = L.GridLayer.extend({
+            createTile: function(coords) {
+                var tile = document.createElement('canvas');
+                var tileSize = this.getTileSize();
+                tile.width = tileSize.x;
+                tile.height = tileSize.y;
+                
+                var ctx = tile.getContext('2d');
+                
+                // Draw grid lines
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.lineWidth = 1;
+                
+                // Calculate how many 100m cells fit in this tile
+                var bounds = this._tileCoordsToBounds(coords);
+                var nw = bounds.getNorthWest();
+                var se = bounds.getSouthEast();
+                
+                // Approximate degrees per 100m (very rough, but works for visualization)
+                var metersPerDegree = 111320; // at equator
+                var cellSizeDegrees = 100 / metersPerDegree;
+                
+                var latRange = nw.lat - se.lat;
+                var lngRange = se.lng - nw.lng;
+                
+                var cellsLat = Math.ceil(latRange / cellSizeDegrees);
+                var cellsLng = Math.ceil(lngRange / cellSizeDegrees);
+                
+                // Draw vertical lines
+                for (var i = 0; i <= cellsLng; i++) {
+                    var x = (i / cellsLng) * tileSize.x;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, tileSize.y);
+                    ctx.stroke();
+                }
+                
+                // Draw horizontal lines
+                for (var j = 0; j <= cellsLat; j++) {
+                    var y = (j / cellsLat) * tileSize.y;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(tileSize.x, y);
+                    ctx.stroke();
+                }
+                
+                return tile;
+            }
+        });
+        
+        L.gridLayer.gridOverlay = function(opts) {
+            return new L.GridLayer.GridOverlay(opts);
+        };
 
         // Layer configurations
         var layerConfigs = {
@@ -644,6 +700,25 @@
                 });
             }
         }
+        
+        function updateGridOverlay() {
+            // Remove existing grid if present
+            if (gridOverlay) {
+                map.removeLayer(gridOverlay);
+                gridOverlay = null;
+            }
+            
+            // Add grid overlay for 100m resolution layers (risk and hotspot)
+            var config = layerConfigs[currentLayer];
+            if (config && config.showCellBorders) {
+                gridOverlay = L.gridLayer.gridOverlay({
+                    pane: 'overlayPane',
+                    opacity: 0.8,
+                    zIndex: 500
+                });
+                gridOverlay.addTo(map);
+            }
+        }
 
         function loadHighRiskBoundaries() {
             fetch('high_risk_boundaries.geojson')
@@ -775,24 +850,9 @@
                         georaster: georaster,
                         opacity: layerOpacity,
                         pixelValuesToColorFn: pixelValuesToColorFn,
-                        resolution: config.showCellBorders ? 128 : 256,  // Lower resolution for bordered layers to show individual cells
+                        resolution: 256,
                         pane: 'rasterPane'
                     });
-                    
-                    // Add cell border styling for 100m resolution layers
-                    if (config.showCellBorders) {
-                        layer.on('add', function() {
-                            setTimeout(function() {
-                                var canvas = layer.getContainer();
-                                if (canvas) {
-                                    canvas.style.imageRendering = 'pixelated';
-                                    canvas.style.imageRendering = '-moz-crisp-edges';
-                                    canvas.style.imageRendering = 'crisp-edges';
-                                    canvas.style.filter = 'drop-shadow(0.5px 0 0 rgba(0,0,0,0.15)) drop-shadow(0 0.5px 0 rgba(0,0,0,0.15))';
-                                }
-                            }, 100);
-                        });
-                    }
                     
                     layers[layerId] = layer;
                     loadedCount++;
@@ -804,6 +864,7 @@
                         currentLayer = layerId;
                         updateLegend(layerId);
                         updateHighRiskBoundaryStyle();
+                        updateGridOverlay();
                     }
                     
                     if (loadedCount === totalLayers) {
@@ -834,6 +895,7 @@
                 currentLayer = layerId;
                 updateLegend(layerId);
                 updateHighRiskBoundaryStyle();
+                updateGridOverlay();
             }
         }
 
@@ -1024,4 +1086,3 @@
     </script>
 </body>
 </html>
-

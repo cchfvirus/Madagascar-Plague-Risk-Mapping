@@ -539,10 +539,13 @@
                 if (values && values[0] && values[0][pixelY]) {
                     var value = values[0][pixelY][pixelX];
                     
+                    console.log('Layer:', layerId, 'Raw value:', value, 'Type:', typeof value);
+                    
                     // Check for nodata value
                     if (value !== null && value !== undefined && !isNaN(value)) {
                         if (georaster.noDataValue !== null && georaster.noDataValue !== undefined && !isNaN(georaster.noDataValue)) {
                             if (Math.abs(value - georaster.noDataValue) < 0.0001) {
+                                console.log('Value matches noDataValue:', georaster.noDataValue);
                                 return null;
                             }
                         }
@@ -713,6 +716,8 @@
                     // Store the georaster for value querying
                     georasters[layerId] = georaster;
                     
+                    console.log('Loaded ' + layerId + ' - noDataValue:', georaster.noDataValue);
+                    
                     // Set default opacity: ENM and Risk = 0.5 (50%), Hotspot = 1.0 (100%)
                     var layerOpacity = (layerId === 'enm' || layerId === 'risk') ? 0.5 : 1.0;
                     
@@ -731,9 +736,19 @@
                             // Round to nearest integer
                             var intValue = Math.round(value);
                             
+                            // Debug: log what we're seeing
+                            if (intValue === 6 || intValue === 9) {
+                                console.log('Found high value:', intValue, 'from raw:', value);
+                            }
+                            
                             // Look up color in discrete mapping
                             if (discreteColors.hasOwnProperty(intValue)) {
                                 return discreteColors[intValue];
+                            }
+                            
+                            // Log unexpected values
+                            if (intValue > 0) {
+                                console.log('Unexpected risk value:', intValue, 'from raw:', value);
                             }
                             
                             // Return null for values not in our discrete set
@@ -955,7 +970,20 @@
             // Get value from the currently visible layer only
             var value = getRasterValueAtPoint(currentLayer, e.latlng);
             var config = layerConfigs[currentLayer];
-            var displayValue = value !== null ? value.toFixed(0) : 'No Data';
+            
+            // Format display value based on layer type
+            var displayValue;
+            if (value !== null) {
+                if (config.discreteColors) {
+                    // For discrete layers (risk), show integer
+                    displayValue = Math.round(value).toString();
+                } else {
+                    // For continuous layers (ENM, hotspot), show 4 decimal places
+                    displayValue = value.toFixed(4);
+                }
+            } else {
+                displayValue = 'No Data';
+            }
             
             var popupContent = '<h3>' + config.name + '</h3><table>';
             popupContent += '<tr><td>Coordinates</td><td>' + e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6) + '</td></tr>';

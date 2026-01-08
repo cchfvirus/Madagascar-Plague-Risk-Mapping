@@ -344,7 +344,7 @@
                 labels: ['No Risk', 'Very High Risk'],
                 description: 'Plague Transmission Risk Zones',
                 customLegend: true,
-                discreteDisplay: true,  // Flag for integer display
+                discreteDisplay: true,
                 legendItems: [
                     { value: 0, color: '#000000', label: '0 - No Risk' },
                     { value: 1, color: '#FFFFBE', label: '1 - Very Low Risk' },
@@ -363,7 +363,7 @@
                 labels: ['Cold Spot', 'Not Significant', 'Hot Spot'],
                 description: 'Getis-Ord Gi* statistic showing spatial clustering of plague risk',
                 customLegend: true,
-                discreteDisplay: true,  // Flag for integer display
+                discreteDisplay: true,
                 legendItems: [
                     { value: 2.58, color: '#ca0020', label: 'Hot Spot with 99% Confidence' },
                     { value: 1.96, color: '#f4a582', label: 'Hot Spot with 95% Confidence' },
@@ -541,13 +541,16 @@
                 if (values && values[0] && values[0][pixelY]) {
                     var value = values[0][pixelY][pixelX];
                     
-                    console.log('Layer:', layerId, 'Raw value:', value, 'Type:', typeof value);
-                    
-                    // Check for nodata value
+                    // Check for nodata value - including common noData values
                     if (value !== null && value !== undefined && !isNaN(value)) {
+                        // Filter out 255 (common noData value for byte rasters)
+                        if (value === 255) {
+                            return null;
+                        }
+                        
+                        // Check georaster's specified noDataValue
                         if (georaster.noDataValue !== null && georaster.noDataValue !== undefined && !isNaN(georaster.noDataValue)) {
                             if (Math.abs(value - georaster.noDataValue) < 0.0001) {
-                                console.log('Value matches noDataValue:', georaster.noDataValue);
                                 return null;
                             }
                         }
@@ -735,22 +738,17 @@
                                 return null;
                             }
                             
+                            // Filter out 255 (noData value)
+                            if (value === 255) {
+                                return null;
+                            }
+                            
                             // Round to nearest integer
                             var intValue = Math.round(value);
-                            
-                            // Debug: log what we're seeing
-                            if (intValue === 6 || intValue === 9) {
-                                console.log('Found high value:', intValue, 'from raw:', value);
-                            }
                             
                             // Look up color in discrete mapping
                             if (discreteColors.hasOwnProperty(intValue)) {
                                 return discreteColors[intValue];
-                            }
-                            
-                            // Log unexpected values
-                            if (intValue > 0) {
-                                console.log('Unexpected risk value:', intValue, 'from raw:', value);
                             }
                             
                             // Return null for values not in our discrete set
@@ -1009,4 +1007,3 @@
     </script>
 </body>
 </html>
-

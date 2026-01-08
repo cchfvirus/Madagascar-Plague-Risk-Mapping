@@ -316,128 +316,6 @@
         var totalLayers = 3;
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
-        var gridOverlay = null;
-
-        // Custom canvas overlay that draws borders around raster cells
-        L.CanvasPixelBorders = L.Layer.extend({
-            initialize: function(georaster, layerId, options) {
-                this._georaster = georaster;
-                this._layerId = layerId;
-                L.setOptions(this, options);
-            },
-            
-            onAdd: function(map) {
-                this._map = map;
-                
-                if (!this._canvas) {
-                    this._initCanvas();
-                }
-                
-                map.getPanes().overlayPane.appendChild(this._canvas);
-                
-                map.on('moveend zoom', this._reset, this);
-                this._reset();
-            },
-            
-            onRemove: function(map) {
-                map.getPanes().overlayPane.removeChild(this._canvas);
-                map.off('moveend zoom', this._reset, this);
-            },
-            
-            _initCanvas: function() {
-                var canvas = L.DomUtil.create('canvas', 'leaflet-pixel-borders-layer');
-                var size = this._map.getSize();
-                canvas.width = size.x;
-                canvas.height = size.y;
-                canvas.style.position = 'absolute';
-                canvas.style.pointerEvents = 'none';
-                this._canvas = canvas;
-            },
-            
-            _reset: function() {
-                var bounds = this._map.getBounds();
-                var size = this._map.getSize();
-                
-                this._canvas.width = size.x;
-                this._canvas.height = size.y;
-                
-                var topLeft = this._map.latLngToContainerPoint(bounds.getNorthWest());
-                L.DomUtil.setPosition(this._canvas, topLeft);
-                
-                this._draw();
-            },
-            
-            _draw: function() {
-                var canvas = this._canvas;
-                var ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                var georaster = this._georaster;
-                var map = this._map;
-                
-                // Get map bounds
-                var bounds = map.getBounds();
-                var zoom = map.getZoom();
-                
-                // Only draw borders when zoomed in enough
-                if (zoom < 12) return;
-                
-                // Get georaster extent
-                var xmin = georaster.xmin;
-                var xmax = georaster.xmax;
-                var ymin = georaster.ymin;
-                var ymax = georaster.ymax;
-                var width = georaster.width;
-                var height = georaster.height;
-                
-                var pixelWidth = (xmax - xmin) / width;
-                var pixelHeight = (ymax - ymin) / height;
-                
-                // Calculate which pixels are visible
-                var startCol = Math.max(0, Math.floor((bounds.getWest() - xmin) / pixelWidth));
-                var endCol = Math.min(width, Math.ceil((bounds.getEast() - xmin) / pixelWidth));
-                var startRow = Math.max(0, Math.floor((ymax - bounds.getNorth()) / pixelHeight));
-                var endRow = Math.min(height, Math.ceil((ymax - bounds.getSouth()) / pixelHeight));
-                
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-                ctx.lineWidth = 1;
-                
-                // Draw borders for each visible pixel that has data
-                for (var row = startRow; row < endRow; row++) {
-                    for (var col = startCol; col < endCol; col++) {
-                        var value = georaster.values[0][row][col];
-                        
-                        // Only draw border if cell has valid data (not NoData)
-                        if (value !== null && value !== undefined && !isNaN(value) && value !== 255) {
-                            // Calculate pixel coordinates
-                            var lng1 = xmin + col * pixelWidth;
-                            var lng2 = lng1 + pixelWidth;
-                            var lat1 = ymax - row * pixelHeight;
-                            var lat2 = lat1 - pixelHeight;
-                            
-                            // Convert to screen coordinates
-                            var nw = map.latLngToContainerPoint([lat1, lng1]);
-                            var ne = map.latLngToContainerPoint([lat1, lng2]);
-                            var sw = map.latLngToContainerPoint([lat2, lng1]);
-                            var se = map.latLngToContainerPoint([lat2, lng2]);
-                            
-                            // Draw rectangle
-                            ctx.beginPath();
-                            ctx.moveTo(nw.x, nw.y);
-                            ctx.lineTo(ne.x, ne.y);
-                            ctx.lineTo(se.x, se.y);
-                            ctx.lineTo(sw.x, sw.y);
-                            ctx.closePath();
-                            ctx.stroke();
-                        }
-                    }
-                }
-            }
-        });
-        
-        L.canvasPixelBorders = function(georaster, layerId, opts) {
-            return new L.CanvasPixelBorders(georaster, layerId, opts);
-        };
 
         // Layer configurations
         var layerConfigs = {
@@ -467,7 +345,6 @@
                 description: 'Plague Transmission Risk Zones',
                 customLegend: true,
                 discreteDisplay: true,
-                showCellBorders: true,  // Enable cell borders for 100m resolution
                 legendItems: [
                     { value: 0, color: '#000000', label: '0 - No Risk' },
                     { value: 1, color: '#FFFFBE', label: '1 - Very Low Risk' },
@@ -487,7 +364,6 @@
                 description: 'Getis-Ord Gi* statistic showing spatial clustering of plague risk',
                 customLegend: true,
                 discreteDisplay: true,
-                showCellBorders: true,  // Enable cell borders for 100m resolution
                 legendItems: [
                     { value: 2.58, color: '#ca0020', label: 'Hot Spot with 99% Confidence' },
                     { value: 1.96, color: '#f4a582', label: 'Hot Spot with 95% Confidence' },
@@ -766,23 +642,6 @@
                 });
             }
         }
-        
-        function updateGridOverlay() {
-            // Remove existing grid if present
-            if (gridOverlay) {
-                map.removeLayer(gridOverlay);
-                gridOverlay = null;
-            }
-            
-            // Add grid overlay for 100m resolution layers (risk and hotspot)
-            var config = layerConfigs[currentLayer];
-            if (config && config.showCellBorders && georasters[currentLayer]) {
-                gridOverlay = L.canvasPixelBorders(georasters[currentLayer], currentLayer, {
-                    pane: 'overlayPane'
-                });
-                gridOverlay.addTo(map);
-            }
-        }
 
         function loadHighRiskBoundaries() {
             fetch('high_risk_boundaries.geojson')
@@ -928,7 +787,6 @@
                         currentLayer = layerId;
                         updateLegend(layerId);
                         updateHighRiskBoundaryStyle();
-                        updateGridOverlay();
                     }
                     
                     if (loadedCount === totalLayers) {
@@ -959,7 +817,6 @@
                 currentLayer = layerId;
                 updateLegend(layerId);
                 updateHighRiskBoundaryStyle();
-                updateGridOverlay();
             }
         }
 

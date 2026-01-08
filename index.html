@@ -206,7 +206,7 @@
         .leaflet-popup-content table td:first-child {
             font-weight: bold;
             color: #666;
-            width: 40%;
+            width: 50%;
         }
         
         /* Coordinate copy notification */
@@ -308,8 +308,9 @@
         // Add default basemap (Street Map)
         streetMap.addTo(map);
 
-        // Store layers
+        // Store layers and georasters
         var layers = {};
+        var georasters = {};
         var currentLayer = null;
         var loadedCount = 0;
         var totalLayers = 3;
@@ -331,11 +332,27 @@
             'risk': {
                 file: 'risk_zones_cog.tif',
                 name: 'Risk Zones (100m)',
-                colors: ['#000000', '#FFFFBE', '#FFAA00', '#FF0000', '#A80000'],
-                domain: [0, 4],
-                labels: ['Low Risk', 'High Risk'],
+                discreteColors: {
+                    0: '#000000',  // Black - No risk/background
+                    1: '#FFFFBE',  // Light yellow - Very low risk
+                    2: '#FFDD00',  // Yellow - Low risk
+                    3: '#FFAA00',  // Orange - Moderate risk
+                    4: '#FF6600',  // Red-orange - Elevated risk
+                    6: '#FF0000',  // Red - High risk
+                    9: '#A80000'   // Dark red - Very high risk
+                },
+                labels: ['No Risk', 'Very High Risk'],
                 description: 'Plague Transmission Risk Zones',
-                continuousLegend: true
+                customLegend: true,
+                legendItems: [
+                    { value: 0, color: '#000000', label: '0 - No Risk' },
+                    { value: 1, color: '#FFFFBE', label: '1 - Very Low Risk' },
+                    { value: 2, color: '#FFDD00', label: '2 - Low Risk' },
+                    { value: 3, color: '#FFAA00', label: '3 - Moderate Risk' },
+                    { value: 4, color: '#FF6600', label: '4 - Elevated Risk' },
+                    { value: 6, color: '#FF0000', label: '6 - High Risk' },
+                    { value: 9, color: '#A80000', label: '9 - Very High Risk' }
+                ]
             },
             'hotspot': {
                 file: 'hotspot_cog.tif',
@@ -479,6 +496,64 @@
             if (layers[layerId]) {
                 layers[layerId].setOpacity(opacity);
             }
+        }
+
+        // Function to get raster value at a point
+        function getRasterValueAtPoint(layerId, latlng) {
+            if (!georasters[layerId]) {
+                return null;
+            }
+            
+            try {
+                var georaster = georasters[layerId];
+                var x = latlng.lng;
+                var y = latlng.lat;
+                
+                // Get georaster bounds
+                var xmin = georaster.xmin;
+                var xmax = georaster.xmax;
+                var ymin = georaster.ymin;
+                var ymax = georaster.ymax;
+                var width = georaster.width;
+                var height = georaster.height;
+                
+                // Check if point is within bounds
+                if (x < xmin || x > xmax || y < ymin || y > ymax) {
+                    return null;
+                }
+                
+                // Calculate pixel coordinates
+                var pixelWidth = (xmax - xmin) / width;
+                var pixelHeight = (ymax - ymin) / height;
+                
+                var pixelX = Math.floor((x - xmin) / pixelWidth);
+                var pixelY = Math.floor((ymax - y) / pixelHeight);
+                
+                // Make sure we're within the raster bounds
+                if (pixelX < 0 || pixelX >= width || pixelY < 0 || pixelY >= height) {
+                    return null;
+                }
+                
+                // Get the value from the raster - values[0] is a 2D array [row][col]
+                var values = georaster.values;
+                if (values && values[0] && values[0][pixelY]) {
+                    var value = values[0][pixelY][pixelX];
+                    
+                    // Check for nodata value
+                    if (value !== null && value !== undefined && !isNaN(value)) {
+                        if (georaster.noDataValue !== null && georaster.noDataValue !== undefined && !isNaN(georaster.noDataValue)) {
+                            if (Math.abs(value - georaster.noDataValue) < 0.0001) {
+                                return null;
+                            }
+                        }
+                        return value;
+                    }
+                }
+            } catch (error) {
+                console.log('Error getting value for ' + layerId + ':', error);
+            }
+            
+            return null;
         }
 
         // Load plague cases from GeoJSON
@@ -635,29 +710,54 @@
                 .then(georaster => {
                     updateStatus(config.name + ' parsed successfully');
                     
-                    var scale = config.mode 
-                        ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
-                        : chroma.scale(config.colors).domain(config.domain);
+                    // Store the georaster for value querying
+                    georasters[layerId] = georaster;
                     
                     // Set default opacity: ENM and Risk = 0.5 (50%), Hotspot = 1.0 (100%)
                     var layerOpacity = (layerId === 'enm' || layerId === 'risk') ? 0.5 : 1.0;
                     
-                    var layer = new GeoRasterLayer({
-                        georaster: georaster,
-                        opacity: layerOpacity,
-                        pixelValuesToColorFn: function(values) {
+                    // Create pixel value to color function based on layer type
+                    var pixelValuesToColorFn;
+                    
+                    if (layerId === 'risk' && config.discreteColors) {
+                        // For discrete risk layer - capture discreteColors in closure
+                        var discreteColors = config.discreteColors;
+                        pixelValuesToColorFn = function(values) {
                             var value = values[0];
-        
                             if (value === null || value === undefined || isNaN(value)) {
                                 return null;
                             }
-        
-                            if (layerId === 'risk' && (value < 0 || value > 4)) {
+                            
+                            // Round to nearest integer
+                            var intValue = Math.round(value);
+                            
+                            // Look up color in discrete mapping
+                            if (discreteColors.hasOwnProperty(intValue)) {
+                                return discreteColors[intValue];
+                            }
+                            
+                            // Return null for values not in our discrete set
+                            return null;
+                        };
+                    } else {
+                        // For continuous layers (ENM, Hotspot)
+                        var scale = config.mode 
+                            ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
+                            : chroma.scale(config.colors).domain(config.domain);
+                        
+                        pixelValuesToColorFn = function(values) {
+                            var value = values[0];
+                            if (value === null || value === undefined || isNaN(value)) {
                                 return null;
                             }
-        
                             return scale(value).hex();
-                        },
+                        };
+                    }
+                    
+                    var layer = new GeoRasterLayer({
+                        georaster: georaster,
+                        opacity: layerOpacity,
+                        pixelValuesToColorFn: pixelValuesToColorFn,
                         resolution: 256,
                         pane: 'rasterPane'
                     });
@@ -756,7 +856,7 @@
                                        config.description + '</p>';
             }
             
-            // Add plague cases legend section if plague cases are loaded (without "Overlays" heading)
+            // Add plague cases legend section if plague cases are loaded
             if (plagueCasesLayer) {
                 legendDiv.innerHTML += 
                     '<div class="plague-cases-section">' +
@@ -834,6 +934,7 @@
                 '<p>Select a layer to view different risk assessments.</p> ' +
                 '<p><em>Click plague case markers for details</em></p>' +
                 '<p><em>Right-click map to copy coordinates</em></p>' +
+                '<p><em>Left-click map to view cell value</em></p>' +
                 '<p><em>Use drawing tools to measure distance/area</em></p>';
             return div;
         };
@@ -844,11 +945,27 @@
             copyCoordinatesToClipboard(e.latlng.lat, e.latlng.lng);
         });
 
-        // Add click handler to show values
+        // Add left-click handler to show cell value from CURRENT layer only
         map.on('click', function(e) {
-            if (currentLayer && layers[currentLayer]) {
-                console.log('Clicked at:', e.latlng);
+            // Check if current layer is loaded
+            if (!currentLayer || !georasters[currentLayer]) {
+                return;
             }
+            
+            // Get value from the currently visible layer only
+            var value = getRasterValueAtPoint(currentLayer, e.latlng);
+            var config = layerConfigs[currentLayer];
+            var displayValue = value !== null ? value.toFixed(0) : 'No Data';
+            
+            var popupContent = '<h3>' + config.name + '</h3><table>';
+            popupContent += '<tr><td>Coordinates</td><td>' + e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6) + '</td></tr>';
+            popupContent += '<tr><td>Cell Value</td><td>' + displayValue + '</td></tr>';
+            popupContent += '</table>';
+            
+            L.popup()
+                .setLatLng(e.latlng)
+                .setContent(popupContent)
+                .openOn(map);
         });
 
         // Load all layers
@@ -862,4 +979,3 @@
     </script>
 </body>
 </html>
-

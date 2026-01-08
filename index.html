@@ -344,6 +344,7 @@
                 labels: ['No Risk', 'Very High Risk'],
                 description: 'Plague Transmission Risk Zones',
                 customLegend: true,
+                discreteDisplay: true,  // Flag for integer display
                 legendItems: [
                     { value: 0, color: '#000000', label: '0 - No Risk' },
                     { value: 1, color: '#FFFFBE', label: '1 - Very Low Risk' },
@@ -362,6 +363,7 @@
                 labels: ['Cold Spot', 'Not Significant', 'Hot Spot'],
                 description: 'Getis-Ord Gi* statistic showing spatial clustering of plague risk',
                 customLegend: true,
+                discreteDisplay: true,  // Flag for integer display
                 legendItems: [
                     { value: 2.58, color: '#ca0020', label: 'Hot Spot with 99% Confidence' },
                     { value: 1.96, color: '#f4a582', label: 'Hot Spot with 95% Confidence' },
@@ -974,11 +976,11 @@
             // Format display value based on layer type
             var displayValue;
             if (value !== null) {
-                if (config.discreteColors) {
-                    // For discrete layers (risk), show integer
+                if (config.discreteDisplay) {
+                    // For discrete layers (risk, hotspot), show integer
                     displayValue = Math.round(value).toString();
                 } else {
-                    // For continuous layers (ENM, hotspot), show 4 decimal places
+                    // For continuous layers (ENM), show 4 decimal places
                     displayValue = value.toFixed(4);
                 }
             } else {
@@ -1007,3 +1009,4 @@
     </script>
 </body>
 </html>
+

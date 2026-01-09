@@ -432,7 +432,7 @@
             },
             'landscan': {
                 file: 'landscan_uncertainty_cog.tif',
-                name: 'LandScan Mosaic Uncertainty',
+                name: 'LandScan Mosaic (Uncertainty)',
                 colors: ['#fee5d9', '#fcbba1', '#fc9272', '#fb6a4a', '#ef3b2c', '#cb181d', '#a50f15', '#67000d'],
                 domain: [0, 1],
                 labels: ['Low Uncertainty', 'High Uncertainty'],
@@ -719,10 +719,27 @@
             
             // Check if area is too large
             var numCells = (endCol - startCol + 1) * (endRow - startRow + 1);
+            
+            // Calculate approximate cell size in meters
+            var cellWidthDeg = pixelWidth;
+            var cellHeightDeg = pixelHeight;
+            var avgLat = (north + south) / 2;
+            var cellWidthM = cellWidthDeg * 111320 * Math.cos(avgLat * Math.PI / 180);
+            var cellHeightM = cellHeightDeg * 111320;
+            
+            var message = 'Selected area will export approximately ' + numCells + ' cells.\n\n';
+            message += 'Layer: ' + config.name + '\n';
+            message += 'Cell size: ~' + Math.round(cellWidthM) + 'm × ' + Math.round(cellHeightM) + 'm\n';
+            message += 'Grid: ' + (endCol - startCol + 1) + ' columns × ' + (endRow - startRow + 1) + ' rows\n\n';
+            
             if (numCells > 10000) {
-                if (!confirm('This will export ' + numCells + ' cells. This may take a while. Continue?')) {
-                    return;
-                }
+                message += 'WARNING: This is a large export and may take a while.\n\n';
+            }
+            
+            message += 'Continue with export?';
+            
+            if (!confirm(message)) {
+                return;
             }
             
             // Build CSV
@@ -776,7 +793,7 @@
                 document.body.removeChild(link);
             }
             
-            alert('Exported ' + count + ' cells to ' + filename);
+            alert('Successfully exported ' + count + ' cells to ' + filename);
         }
 
         // Load plague cases from GeoJSON

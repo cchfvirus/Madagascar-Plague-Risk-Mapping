@@ -313,7 +313,7 @@
         var georasters = {};
         var currentLayer = null;
         var loadedCount = 0;
-        var totalLayers = 3;
+        var totalLayers = 4;
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
 
@@ -373,6 +373,15 @@
                     { value: -1.96, color: '#92c5de', label: 'Cold Spot with 95% Confidence' },
                     { value: -2.58, color: '#0571b0', label: 'Cold Spot with 99% Confidence' }
                 ]
+            },
+            'landscan': {
+                file: 'landscan_uncertainty.tif',
+                name: 'LandScan Mosaic Uncertainty',
+                colors: ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b'],
+                domain: [0, 1],
+                labels: ['Low Uncertainty', 'High Uncertainty'],
+                description: 'Population distribution uncertainty metric',
+                continuousLegend: true
             }
         };
 
@@ -723,8 +732,8 @@
                     
                     console.log('Loaded ' + layerId + ' - noDataValue:', georaster.noDataValue);
                     
-                    // Set default opacity: ENM and Risk = 0.5 (50%), Hotspot = 1.0 (100%)
-                    var layerOpacity = (layerId === 'enm' || layerId === 'risk') ? 0.5 : 1.0;
+                    // Set default opacity: All layers default to 0.5 (50%)
+                    var layerOpacity = 0.5;
                     
                     // Create pixel value to color function based on layer type
                     var pixelValuesToColorFn;
@@ -911,12 +920,12 @@
             div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">High-Risk Regions</label>';
             div.innerHTML += '</div>';
             
-            // Opacity sliders section - ENM and Risk default to 50%, Hotspot to 100%
+            // Opacity sliders section - All layers default to 50%
             div.innerHTML += '<div class="opacity-section">';
             div.innerHTML += '<h5>Layer Opacity</h5>';
             
             Object.keys(layerConfigs).forEach(function(key) {
-                var defaultOpacity = (key === 'enm' || key === 'risk') ? 0.5 : 1.0;
+                var defaultOpacity = 0.5;
                 div.innerHTML += 
                     '<div class="opacity-control">' +
                     '<label>' + layerConfigs[key].name + ' <span class="opacity-value" id="opacity-value-' + key + '">' + Math.round(defaultOpacity * 100) + '%</span></label>' +
@@ -1007,3 +1016,4 @@
     </script>
 </body>
 </html>
+

@@ -367,7 +367,7 @@
         var georasters = {};
         var currentLayer = null;
         var loadedCount = 0;
-        var totalLayers = 4;
+        var totalLayers = 5;
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
         var isExportMode = false;
@@ -437,6 +437,15 @@
                 domain: [0, 1],
                 labels: ['Low Uncertainty', 'High Uncertainty'],
                 description: 'Population distribution uncertainty metric',
+                continuousLegend: true
+            },
+            'population': {
+                file: 'landscan_pop_cog.tif',
+                name: 'LandScan Mosaic (Population)',
+                colors: ['#fff7ec', '#fee8c8', '#fdd49e', '#fdbb84', '#fc8d59', '#ef6548', '#d7301f', '#b30000', '#7f0000'],
+                domain: [0, 2634],
+                labels: ['Low Density', 'High Density'],
+                description: 'Population density distribution',
                 continuousLegend: true
             }
         };

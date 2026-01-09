@@ -377,7 +377,7 @@
             'landscan': {
                 file: 'landscan_uncertainty_cog.tif',
                 name: 'LandScan Mosaic Uncertainty',
-                colors: ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b'],
+                colors: ['#fee5d9', '#fcbba1', '#fc9272', '#fb6a4a', '#ef3b2c', '#cb181d', '#a50f15', '#67000d'],
                 domain: [0, 1],
                 labels: ['Low Uncertainty', 'High Uncertainty'],
                 description: 'Population distribution uncertainty metric',
@@ -550,19 +550,25 @@
                 if (values && values[0] && values[0][pixelY]) {
                     var value = values[0][pixelY][pixelX];
                     
+                    console.log('Layer:', layerId, 'Raw value:', value, 'Type:', typeof value, 'NoDataValue:', georaster.noDataValue);
+                    
                     // Check for nodata value - including common noData values
                     if (value !== null && value !== undefined && !isNaN(value)) {
-                        // Filter out 255 (common noData value for byte rasters)
-                        if (value === 255) {
+                        // Filter out common NoData values
+                        if (value === 255 || value === -9999 || value === -3.4e38 || 
+                            Math.abs(value) > 1e10 || value === -32768) {
+                            console.log('Filtered as NoData:', value);
                             return null;
                         }
                         
                         // Check georaster's specified noDataValue
                         if (georaster.noDataValue !== null && georaster.noDataValue !== undefined && !isNaN(georaster.noDataValue)) {
                             if (Math.abs(value - georaster.noDataValue) < 0.0001) {
+                                console.log('Value matches noDataValue:', georaster.noDataValue);
                                 return null;
                             }
                         }
+                        
                         return value;
                     }
                 }

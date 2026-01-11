@@ -311,6 +311,47 @@
             max-width: 300px;
             text-align: center;
         }
+        
+        /* 3D View button */
+        .view-3d-control {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(calc(-50% - 110px));
+            z-index: 1000;
+        }
+        
+        .view-3d-btn {
+            background: white;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 13px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+        
+        .view-3d-btn:hover {
+            background: #f0f0f0;
+            border-color: #999;
+        }
+        
+        .view-3d-btn.active {
+            background: #2196F3;
+            color: white;
+            border-color: #2196F3;
+        }
+        
+        /* 3D Canvas */
+        #deck-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -319,8 +360,12 @@
         <div id="load-status" style="margin-top: 10px; font-size: 12px;"></div>
     </div>
     <div id="map"></div>
+    <div id="deck-canvas"></div>
     <div class="north-arrow"></div>
     <div id="copy-notification" class="copy-notification"></div>
+    <div class="view-3d-control">
+        <button id="view-3d-btn" class="view-3d-btn" onclick="toggle3DView()">🏗️ 3D View</button>
+    </div>
     <div class="export-control">
         <button id="export-btn" class="export-btn" onclick="toggleExportMode()">📊 Export Cell Data</button>
     </div>
@@ -333,6 +378,7 @@
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
 
     <script>
         // Initialize map - centered on Antananarivo region (central Madagascar) with zoom 10
@@ -372,6 +418,8 @@
         var highRiskBoundariesLayer = null;
         var isExportMode = false;
         var exportRectangle = null;
+        var is3DView = false;
+        var deckgl = null;
 
         // Layer configurations
         var layerConfigs = {
@@ -796,6 +844,191 @@
             alert('Successfully exported ' + count + ' cells to ' + filename);
         }
 
+        // Toggle 3D view
+        function toggle3DView() {
+            is3DView = !is3DView;
+            var btn = document.getElementById('view-3d-btn');
+            var mapDiv = document.getElementById('map');
+            var deckCanvas = document.getElementById('deck-canvas');
+            
+            if (is3DView) {
+                btn.classList.add('active');
+                btn.textContent = '🗺️ 2D View';
+                mapDiv.style.display = 'none';
+                deckCanvas.style.display = 'block';
+                initialize3DView();
+            } else {
+                btn.classList.remove('active');
+                btn.textContent = '🏗️ 3D View';
+                mapDiv.style.display = 'block';
+                deckCanvas.style.display = 'none';
+                if (deckgl) {
+                    deckgl.finalize();
+                    deckgl = null;
+                }
+            }
+        }
+
+        // Initialize 3D view with Deck.gl
+        function initialize3DView() {
+            if (!currentLayer || !georasters[currentLayer]) {
+                alert('Please wait for layers to load');
+                toggle3DView();
+                return;
+            }
+            
+            var georaster = georasters[currentLayer];
+            var config = layerConfigs[currentLayer];
+            
+            // Convert raster to 3D column data
+            var data = rasterTo3DColumns(georaster, config);
+            
+            // Get map center and zoom
+            var center = map.getCenter();
+            var zoom = map.getZoom();
+            
+            // Create Deck.gl instance
+            var {DeckGL, ColumnLayer} = deck;
+            
+            deckgl = new DeckGL({
+                container: 'deck-canvas',
+                initialViewState: {
+                    longitude: center.lng,
+                    latitude: center.lat,
+                    zoom: zoom,
+                    pitch: 45,
+                    bearing: 0
+                },
+                controller: true,
+                layers: [
+                    new ColumnLayer({
+                        id: '3d-columns',
+                        data: data,
+                        diskResolution: 4,
+                        radius: 50,
+                        elevationScale: 1,
+                        extruded: true,
+                        wireframe: false,
+                        getPosition: d => [d.lng, d.lat],
+                        getElevation: d => d.height,
+                        getFillColor: d => d.color,
+                        pickable: true,
+                        autoHighlight: true,
+                        onHover: ({object}) => {
+                            if (object) {
+                                document.body.style.cursor = 'pointer';
+                            } else {
+                                document.body.style.cursor = 'default';
+                            }
+                        }
+                    })
+                ]
+            });
+        }
+
+        // Convert raster data to 3D column format
+        function rasterTo3DColumns(georaster, config) {
+            var data = [];
+            var xmin = georaster.xmin;
+            var xmax = georaster.xmax;
+            var ymin = georaster.ymin;
+            var ymax = georaster.ymax;
+            var width = georaster.width;
+            var height = georaster.height;
+            
+            var pixelWidth = (xmax - xmin) / width;
+            var pixelHeight = (ymax - ymin) / height;
+            
+            // Sample every N pixels to avoid too many columns (performance)
+            var sampleRate = Math.max(1, Math.floor(width / 500));
+            
+            for (var row = 0; row < height; row += sampleRate) {
+                for (var col = 0; col < width; col += sampleRate) {
+                    var value = georaster.values[0][row][col];
+                    
+                    // Skip NoData
+                    if (value === null || value === undefined || isNaN(value) ||
+                        value === 255 || value === -9999 || value === -3.4e38 ||
+                        Math.abs(value) > 1e10 || value === -32768) {
+                        continue;
+                    }
+                    
+                    var lng = xmin + (col + 0.5) * pixelWidth;
+                    var lat = ymax - (row + 0.5) * pixelHeight;
+                    
+                    // Calculate height and color based on layer type
+                    var columnHeight = 0;
+                    var color = [128, 128, 128, 200];
+                    
+                    if (config.discreteColors) {
+                        // Discrete layers (Risk Zones)
+                        var intValue = Math.round(value);
+                        if (config.discreteColors[intValue]) {
+                            columnHeight = getHeightForDiscreteValue(intValue);
+                            color = hexToRgb(config.discreteColors[intValue]);
+                        }
+                    } else {
+                        // Continuous layers (ENM, Hotspot, LandScan)
+                        columnHeight = getHeightForContinuousValue(value, config);
+                        var hexColor = getColorForValue(value, config);
+                        color = hexToRgb(hexColor);
+                    }
+                    
+                    if (columnHeight > 0) {
+                        data.push({
+                            lng: lng,
+                            lat: lat,
+                            height: columnHeight,
+                            color: color,
+                            value: value
+                        });
+                    }
+                }
+            }
+            
+            return data;
+        }
+
+        // Get height for discrete values (Risk Zones)
+        function getHeightForDiscreteValue(value) {
+            var heights = {
+                0: 0,
+                1: 100,
+                2: 200,
+                3: 400,
+                4: 800,
+                6: 1600,
+                9: 3200
+            };
+            return heights[value] || 0;
+        }
+
+        // Get height for continuous values
+        function getHeightForContinuousValue(value, config) {
+            var normalized = (value - config.domain[0]) / (config.domain[1] - config.domain[0]);
+            normalized = Math.max(0, Math.min(1, normalized));
+            return normalized * 2000; // Max height 2000m
+        }
+
+        // Get color for continuous values
+        function getColorForValue(value, config) {
+            var scale = config.mode 
+                ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
+                : chroma.scale(config.colors).domain(config.domain);
+            return scale(value).hex();
+        }
+
+        // Convert hex color to RGB array
+        function hexToRgb(hex) {
+            var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? [
+                parseInt(result[1], 16),
+                parseInt(result[2], 16),
+                parseInt(result[3], 16),
+                200 // Alpha
+            ] : [128, 128, 128, 200];
+        }
+
         // Load plague cases from GeoJSON
         function loadPlagueCases() {
             fetch('cases.geojson')
@@ -1049,6 +1282,11 @@
                 currentLayer = layerId;
                 updateLegend(layerId);
                 updateHighRiskBoundaryStyle();
+                
+                // Update 3D view if active
+                if (is3DView && deckgl) {
+                    initialize3DView();
+                }
             }
         }
 
@@ -1239,4 +1477,3 @@
     </script>
 </body>
 </html>
-

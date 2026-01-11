@@ -917,7 +917,7 @@
                     longitude: center.lng,
                     latitude: center.lat,
                     zoom: zoom,
-                    pitch: 45,
+                    pitch: 50,
                     bearing: 0,
                     maxZoom: 20,
                     minZoom: 5
@@ -930,15 +930,21 @@
                         getPosition: d => [d.lng, d.lat],
                         getElevationWeight: d => d.weight,
                         getColorWeight: d => d.weight,
-                        elevationScale: config.discreteColors ? 50 : 30,
+                        elevationScale: config.discreteColors ? 15 : 10,  // Much lower!
                         extruded: true,
-                        radius: 200,
-                        coverage: 0.9,
+                        radius: 500,  // Larger hexagons = fewer of them
+                        coverage: 0.7,  // More spacing between hexagons
                         upperPercentile: 100,
                         colorRange: getColorRangeForLayer(config),
-                        elevationRange: [0, config.discreteColors ? 5000 : 3000],
+                        elevationRange: [0, config.discreteColors ? 2000 : 1500],  // Lower max height
                         pickable: true,
                         autoHighlight: true,
+                        material: {
+                            ambient: 0.64,
+                            diffuse: 0.6,
+                            shininess: 32,
+                            specularColor: [51, 51, 51]
+                        },
                         onHover: (info) => updateTooltip3D(info, config)
                     })
                 ]
@@ -1013,15 +1019,15 @@
             var pixelWidth = (xmax - xmin) / width;
             var pixelHeight = (ymax - ymin) / height;
             
-            // Adaptive sampling based on raster size
-            var sampleRate = 1;
+            // AGGRESSIVE sampling for performance - skip many pixels
+            var sampleRate = 5;  // Sample every 5th pixel
             if (width > 5000 || height > 5000) {
-                sampleRate = 2;
-            } else if (width > 2000 || height > 2000) {
-                sampleRate = 1;
+                sampleRate = 10;  // Sample every 10th pixel for very large rasters
+            } else if (width > 3000 || height > 3000) {
+                sampleRate = 7;
             }
             
-            console.log('Raster size:', width, 'x', height, 'Sample rate:', sampleRate);
+            console.log('Raster size:', width, 'x', height, 'Sample rate: 1 in', sampleRate);
             
             for (var row = 0; row < height; row += sampleRate) {
                 for (var col = 0; col < width; col += sampleRate) {
@@ -1052,9 +1058,9 @@
                     // Weight determines both height and color intensity
                     var weight = value;
                     if (config.discreteColors) {
-                        // For discrete values, use exponential weighting
+                        // For discrete values, use moderate weighting
                         var intValue = Math.round(value);
-                        weight = Math.pow(2, intValue); // 1→2, 2→4, 3→8, 4→16, 6→64, 9→512
+                        weight = intValue * 10;  // Linear instead of exponential
                     }
                     
                     data.push({
@@ -1528,3 +1534,4 @@
     </script>
 </body>
 </html>
+

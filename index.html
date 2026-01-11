@@ -320,6 +320,7 @@
             left: 50%;
             transform: translateX(calc(-50% - 110px));
             z-index: 1000;
+            display: none;  /* Hidden by default, shown only for risk zones */
         }
         
         .view-3d-btn {
@@ -657,6 +658,20 @@
             }
         }
 
+        // Show/hide heatmap button based on layer
+        function updateHeatmapButtonVisibility() {
+            var heatmapBtn = document.querySelector('.view-3d-control');
+            if (currentLayer === 'risk') {
+                heatmapBtn.style.display = 'block';
+            } else {
+                heatmapBtn.style.display = 'none';
+                // If heatmap is active on a non-risk layer, switch back to 2D
+                if (is3DView) {
+                    toggle3DView();
+                }
+            }
+        }
+
         // Function to get raster value at a point
         function getRasterValueAtPoint(layerId, latlng) {
             if (!georasters[layerId]) {
@@ -898,9 +913,9 @@
             var georaster = georasters[currentLayer];
             var config = layerConfigs[currentLayer];
             
-            // Only allow heatmap for risk zones and hotspot layers
-            if (currentLayer !== 'risk' && currentLayer !== 'hotspot') {
-                alert('Heatmap view is only available for Risk Zones and Hot Spot Analysis layers');
+            // Only allow heatmap for risk zones layer
+            if (currentLayer !== 'risk') {
+                alert('Heatmap view is only available for the Risk Zones layer');
                 toggle3DView();
                 return;
             }
@@ -946,31 +961,20 @@
             });
         }
 
-        // Get heatmap color range based on layer
+        // Get heatmap color range for risk zones
         function getHeatmapColors(config) {
-            if (config.discreteColors) {
-                // For risk zones - use warm colors (yellow to red)
-                return [
-                    [255, 255, 204],  // Light yellow
-                    [255, 237, 160],  // Yellow
-                    [254, 217, 118],  // Light orange
-                    [254, 178, 76],   // Orange
-                    [253, 141, 60],   // Dark orange
-                    [252, 78, 42],    // Red-orange
-                    [227, 26, 28],    // Red
-                    [189, 0, 38],     // Dark red
-                    [128, 0, 38]      // Very dark red
-                ];
-            } else {
-                // For hotspot - blue to red gradient
-                return [
-                    [5, 113, 176],    // Dark blue (cold spot)
-                    [146, 197, 222],  // Light blue
-                    [247, 247, 247],  // White (not significant)
-                    [244, 165, 130],  // Light red
-                    [202, 0, 32]      // Dark red (hot spot)
-                ];
-            }
+            // Yellow to red gradient for risk zones
+            return [
+                [255, 255, 204],  // Light yellow
+                [255, 237, 160],  // Yellow
+                [254, 217, 118],  // Light orange
+                [254, 178, 76],   // Orange
+                [253, 141, 60],   // Dark orange
+                [252, 78, 42],    // Red-orange
+                [227, 26, 28],    // Red
+                [189, 0, 38],     // Dark red
+                [128, 0, 38]      // Very dark red
+            ];
         }
 
         // Convert raster to heatmap points - USE ALL CELLS
@@ -1019,16 +1023,10 @@
                     var lng = xmin + (col + 0.5) * pixelWidth;
                     var lat = ymax - (row + 0.5) * pixelHeight;
                     
-                    // Calculate weight for heatmap
+                    // Calculate weight for heatmap (risk zones only)
                     var weight = 1;
-                    if (config.discreteColors) {
-                        // For risk zones, use value as weight
-                        var intValue = Math.round(value);
-                        weight = intValue * 2;  // Amplify the weight
-                    } else {
-                        // For hotspot, use absolute value (hot and cold spots)
-                        weight = Math.abs(value) + 1;
-                    }
+                    var intValue = Math.round(value);
+                    weight = intValue * 2;  // Amplify the weight (1→2, 2→4, 3→6, etc.)
                     
                     if (weight > 0) {
                         data.push({
@@ -1269,6 +1267,7 @@
                         currentLayer = layerId;
                         updateLegend(layerId);
                         updateHighRiskBoundaryStyle();
+                        updateHeatmapButtonVisibility();
                     }
                     
                     if (loadedCount === totalLayers) {
@@ -1299,6 +1298,7 @@
                 currentLayer = layerId;
                 updateLegend(layerId);
                 updateHighRiskBoundaryStyle();
+                updateHeatmapButtonVisibility();
                 
                 // Update 3D view if active
                 if (is3DView && deckgl) {
@@ -1494,4 +1494,3 @@
     </script>
 </body>
 </html>
-

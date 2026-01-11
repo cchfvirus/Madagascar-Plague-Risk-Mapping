@@ -7,6 +7,7 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.css" />
     
     <style>
         body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
@@ -352,6 +353,20 @@
             height: 100%;
             display: none;
         }
+        
+        /* 3D Tooltip */
+        #deck-tooltip {
+            position: absolute;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            font-size: 12px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 10000;
+            display: none;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -361,6 +376,7 @@
     </div>
     <div id="map"></div>
     <div id="deck-canvas"></div>
+    <div id="deck-tooltip"></div>
     <div class="north-arrow"></div>
     <div id="copy-notification" class="copy-notification"></div>
     <div class="view-3d-control">
@@ -378,6 +394,7 @@
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
 
     <script>
@@ -862,6 +879,7 @@
                 btn.textContent = '🏗️ 3D View';
                 mapDiv.style.display = 'block';
                 deckCanvas.style.display = 'none';
+                document.getElementById('deck-tooltip').style.display = 'none';
                 if (deckgl) {
                     deckgl.finalize();
                     deckgl = null;
@@ -869,7 +887,7 @@
             }
         }
 
-        // Initialize 3D view with Deck.gl
+        // Initialize 3D view with Deck.gl and MapLibre basemap
         function initialize3DView() {
             if (!currentLayer || !georasters[currentLayer]) {
                 alert('Please wait for layers to load');
@@ -880,54 +898,79 @@
             var georaster = georasters[currentLayer];
             var config = layerConfigs[currentLayer];
             
-            // Convert raster to 3D column data
-            var data = rasterTo3DColumns(georaster, config);
+            // Convert raster to 3D hexagon data
+            var data = rasterTo3DHexagons(georaster, config);
+            
+            console.log('Generated ' + data.length + ' hexagons for 3D view');
             
             // Get map center and zoom
             var center = map.getCenter();
             var zoom = map.getZoom();
             
-            // Create Deck.gl instance
-            var {DeckGL, ColumnLayer} = deck;
+            // Create Deck.gl instance with MapLibre basemap
+            var {DeckGL, HexagonLayer} = deck;
             
             deckgl = new DeckGL({
                 container: 'deck-canvas',
+                mapStyle: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
                 initialViewState: {
                     longitude: center.lng,
                     latitude: center.lat,
                     zoom: zoom,
                     pitch: 45,
-                    bearing: 0
+                    bearing: 0,
+                    maxZoom: 20,
+                    minZoom: 5
                 },
                 controller: true,
                 layers: [
-                    new ColumnLayer({
-                        id: '3d-columns',
+                    new HexagonLayer({
+                        id: '3d-hexagons',
                         data: data,
-                        diskResolution: 4,
-                        radius: 50,
+                        radius: 100,
                         elevationScale: 1,
                         extruded: true,
-                        wireframe: false,
+                        coverage: 0.95,
                         getPosition: d => [d.lng, d.lat],
                         getElevation: d => d.height,
                         getFillColor: d => d.color,
                         pickable: true,
                         autoHighlight: true,
-                        onHover: ({object}) => {
-                            if (object) {
-                                document.body.style.cursor = 'pointer';
-                            } else {
-                                document.body.style.cursor = 'default';
-                            }
-                        }
+                        highlightColor: [255, 255, 255, 100],
+                        onHover: (info) => updateTooltip(info)
                     })
                 ]
             });
         }
 
-        // Convert raster data to 3D column format
-        function rasterTo3DColumns(georaster, config) {
+        // Update tooltip on hover
+        function updateTooltip(info) {
+            var tooltip = document.getElementById('deck-tooltip');
+            
+            if (info.object) {
+                var config = layerConfigs[currentLayer];
+                var value = info.object.value;
+                var displayValue;
+                
+                if (config.discreteDisplay) {
+                    displayValue = Math.round(value);
+                } else {
+                    displayValue = value.toFixed(4);
+                }
+                
+                tooltip.innerHTML = '<strong>' + config.name + '</strong><br/>' +
+                                   'Value: ' + displayValue + '<br/>' +
+                                   'Height: ' + Math.round(info.object.height) + 'm';
+                tooltip.style.display = 'block';
+                tooltip.style.left = info.x + 10 + 'px';
+                tooltip.style.top = info.y + 10 + 'px';
+            } else {
+                tooltip.style.display = 'none';
+            }
+        }
+
+        // Convert raster data to 3D hexagon format
+        function rasterTo3DHexagons(georaster, config) {
             var data = [];
             var xmin = georaster.xmin;
             var xmax = georaster.xmax;
@@ -939,17 +982,35 @@
             var pixelWidth = (xmax - xmin) / width;
             var pixelHeight = (ymax - ymin) / height;
             
-            // Sample every N pixels to avoid too many columns (performance)
-            var sampleRate = Math.max(1, Math.floor(width / 500));
+            // Sample rate - adjust based on raster size for performance
+            // For 100m layers, sample every pixel at high zoom
+            var sampleRate = 1;
+            if (width > 2000) {
+                sampleRate = Math.max(1, Math.floor(width / 2000));
+            }
+            
+            console.log('Raster size:', width, 'x', height, 'Sample rate:', sampleRate);
             
             for (var row = 0; row < height; row += sampleRate) {
                 for (var col = 0; col < width; col += sampleRate) {
                     var value = georaster.values[0][row][col];
                     
-                    // Skip NoData
+                    // Check georaster's noDataValue
+                    if (georaster.noDataValue !== null && georaster.noDataValue !== undefined && !isNaN(georaster.noDataValue)) {
+                        if (Math.abs(value - georaster.noDataValue) < 0.0001) {
+                            continue;
+                        }
+                    }
+                    
+                    // Skip common NoData values
                     if (value === null || value === undefined || isNaN(value) ||
                         value === 255 || value === -9999 || value === -3.4e38 ||
                         Math.abs(value) > 1e10 || value === -32768) {
+                        continue;
+                    }
+                    
+                    // For risk zones, skip value 0 (no risk)
+                    if (config.discreteColors && Math.round(value) === 0) {
                         continue;
                     }
                     
@@ -957,28 +1018,30 @@
                     var lat = ymax - (row + 0.5) * pixelHeight;
                     
                     // Calculate height and color based on layer type
-                    var columnHeight = 0;
+                    var hexHeight = 0;
                     var color = [128, 128, 128, 200];
                     
                     if (config.discreteColors) {
                         // Discrete layers (Risk Zones)
                         var intValue = Math.round(value);
                         if (config.discreteColors[intValue]) {
-                            columnHeight = getHeightForDiscreteValue(intValue);
+                            hexHeight = getHeightForDiscreteValue(intValue);
                             color = hexToRgb(config.discreteColors[intValue]);
+                        } else {
+                            continue; // Skip values not in discrete set
                         }
                     } else {
                         // Continuous layers (ENM, Hotspot, LandScan)
-                        columnHeight = getHeightForContinuousValue(value, config);
+                        hexHeight = getHeightForContinuousValue(value, config);
                         var hexColor = getColorForValue(value, config);
                         color = hexToRgb(hexColor);
                     }
                     
-                    if (columnHeight > 0) {
+                    if (hexHeight > 0) {
                         data.push({
                             lng: lng,
                             lat: lat,
-                            height: columnHeight,
+                            height: hexHeight,
                             color: color,
                             value: value
                         });
@@ -992,13 +1055,13 @@
         // Get height for discrete values (Risk Zones)
         function getHeightForDiscreteValue(value) {
             var heights = {
-                0: 0,
-                1: 100,
-                2: 200,
-                3: 400,
-                4: 800,
-                6: 1600,
-                9: 3200
+                0: 0,       // No height for no risk
+                1: 200,     // 200m
+                2: 400,     // 400m
+                3: 800,     // 800m
+                4: 1600,    // 1600m
+                6: 3200,    // 3200m
+                9: 6400     // 6400m - Very dramatic!
             };
             return heights[value] || 0;
         }
@@ -1007,7 +1070,7 @@
         function getHeightForContinuousValue(value, config) {
             var normalized = (value - config.domain[0]) / (config.domain[1] - config.domain[0]);
             normalized = Math.max(0, Math.min(1, normalized));
-            return normalized * 2000; // Max height 2000m
+            return normalized * 3000; // Max height 3000m
         }
 
         // Get color for continuous values
@@ -1025,8 +1088,8 @@
                 parseInt(result[1], 16),
                 parseInt(result[2], 16),
                 parseInt(result[3], 16),
-                200 // Alpha
-            ] : [128, 128, 128, 200];
+                220 // Alpha - slightly more opaque
+            ] : [128, 128, 128, 220];
         }
 
         // Load plague cases from GeoJSON

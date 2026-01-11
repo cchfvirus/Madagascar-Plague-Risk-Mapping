@@ -380,10 +380,10 @@
     <div class="north-arrow"></div>
     <div id="copy-notification" class="copy-notification"></div>
     <div class="view-3d-control">
-        <button id="view-3d-btn" class="view-3d-btn" onclick="toggle3DView()">🏗️ 3D View</button>
+        <button id="view-3d-btn" class="view-3d-btn" onclick="toggle3DView()">Heatmap View</button>
     </div>
     <div class="export-control">
-        <button id="export-btn" class="export-btn" onclick="toggleExportMode()">📊 Export Cell Data</button>
+        <button id="export-btn" class="export-btn" onclick="toggleExportMode()">Export Cell Data</button>
     </div>
     <div id="export-instruction" class="export-instruction">
         Click and drag to select area, then export to CSV
@@ -870,13 +870,13 @@
             
             if (is3DView) {
                 btn.classList.add('active');
-                btn.textContent = '🗺️ 2D View';
+                btn.textContent = '2D View';
                 mapDiv.style.display = 'none';
                 deckCanvas.style.display = 'block';
                 initialize3DView();
             } else {
                 btn.classList.remove('active');
-                btn.textContent = '🏗️ 3D View';
+                btn.textContent = 'Heatmap View';
                 mapDiv.style.display = 'block';
                 deckCanvas.style.display = 'none';
                 document.getElementById('deck-tooltip').style.display = 'none';
@@ -898,79 +898,77 @@
             var georaster = georasters[currentLayer];
             var config = layerConfigs[currentLayer];
             
-            // Convert raster to hexagon data
-            var data = rasterToHexagons(georaster, config);
+            // Convert raster to heatmap points
+            var data = rasterToHeatmapPoints(georaster, config);
             
-            console.log('Generated ' + data.length + ' hexagons for 3D view');
+            console.log('Generated ' + data.length + ' points for heatmap');
             
             // Get map center and zoom
             var center = map.getCenter();
             var zoom = map.getZoom();
             
-            // Create Deck.gl instance with dark basemap like CARTO example
-            var {DeckGL, HexagonLayer} = deck;
+            // Create Deck.gl instance with dark basemap
+            var {DeckGL, HeatmapLayer} = deck;
             
             deckgl = new DeckGL({
                 container: 'deck-canvas',
-                mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+                mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json',
                 initialViewState: {
                     longitude: center.lng,
                     latitude: center.lat,
                     zoom: zoom,
-                    pitch: 60,
-                    bearing: -30,
+                    pitch: 0,
+                    bearing: 0,
                     maxZoom: 20,
                     minZoom: 5
                 },
                 controller: true,
                 layers: [
-                    new HexagonLayer({
-                        id: '3d-hexagons',
+                    new HeatmapLayer({
+                        id: 'heatmap-layer',
                         data: data,
-                        pickable: true,
-                        extruded: true,
-                        radius: 300,
-                        elevationScale: config.discreteColors ? 0.5 : 0.3,
-                        coverage: 0.8,
                         getPosition: d => d.position,
-                        getFillColor: d => d.color,
-                        getElevation: d => d.elevation,
-                        material: {
-                            ambient: 0.35,
-                            diffuse: 0.6,
-                            shininess: 32,
-                            specularColor: [30, 30, 30]
-                        },
-                        updateTriggers: {
-                            getFillColor: [currentLayer],
-                            getElevation: [currentLayer]
-                        },
-                        onHover: (info) => updateTooltip3D(info, config)
+                        getWeight: d => d.weight,
+                        radiusPixels: 30,
+                        intensity: 1,
+                        threshold: 0.03,
+                        colorRange: getHeatmapColors(config),
+                        aggregation: 'SUM'
                     })
                 ]
             });
         }
 
-        // Update tooltip
-        function updateTooltip3D(info, config) {
-            var tooltip = document.getElementById('deck-tooltip');
-            
-            if (info.object) {
-                var value = info.object.value;
-                var displayValue = config.discreteDisplay ? Math.round(value) : value.toFixed(2);
-                
-                tooltip.innerHTML = '<strong>' + config.name + '</strong><br/>' +
-                                   'Value: ' + displayValue;
-                tooltip.style.display = 'block';
-                tooltip.style.left = info.x + 10 + 'px';
-                tooltip.style.top = info.y + 10 + 'px';
+        // Get heatmap color range based on layer
+        function getHeatmapColors(config) {
+            if (config.discreteColors) {
+                // For risk zones - use warm colors (yellow to red)
+                return [
+                    [255, 255, 204],  // Light yellow
+                    [255, 237, 160],  // Yellow
+                    [254, 217, 118],  // Light orange
+                    [254, 178, 76],   // Orange
+                    [253, 141, 60],   // Dark orange
+                    [252, 78, 42],    // Red-orange
+                    [227, 26, 28],    // Red
+                    [189, 0, 38],     // Dark red
+                    [128, 0, 38]      // Very dark red
+                ];
             } else {
-                tooltip.style.display = 'none';
+                // For continuous layers - convert hex colors to RGB
+                return config.colors.map(hexColor => {
+                    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hexColor);
+                    return result ? [
+                        parseInt(result[1], 16),
+                        parseInt(result[2], 16),
+                        parseInt(result[3], 16)
+                    ] : [128, 128, 128];
+                });
             }
         }
 
-        // Convert raster to hexagon data with aggressive sampling
-        function rasterToHexagons(georaster, config) {
+        // Convert raster to heatmap points with weights
+        function rasterToHeatmapPoints(georaster, config) {
             var data = [];
             var xmin = georaster.xmin;
             var xmax = georaster.xmax;
@@ -982,12 +980,12 @@
             var pixelWidth = (xmax - xmin) / width;
             var pixelHeight = (ymax - ymin) / height;
             
-            // Very aggressive sampling for smooth performance
-            var sampleRate = 12;  // Sample every 12th pixel
+            // Moderate sampling - heatmap is very efficient
+            var sampleRate = 3;  // Sample every 3rd pixel
             if (width > 5000 || height > 5000) {
-                sampleRate = 20;  // Even more aggressive for large rasters
-            } else if (width < 2000 && height < 2000) {
-                sampleRate = 8;
+                sampleRate = 5;
+            } else if (width < 1000 && height < 1000) {
+                sampleRate = 2;
             }
             
             console.log('Raster size:', width, 'x', height, 'Sample rate: 1 in', sampleRate);
@@ -1018,31 +1016,22 @@
                     var lng = xmin + (col + 0.5) * pixelWidth;
                     var lat = ymax - (row + 0.5) * pixelHeight;
                     
-                    // Calculate elevation and color
-                    var elevation = 0;
-                    var color = [128, 128, 128, 255];
-                    
+                    // Calculate weight for heatmap
+                    var weight = 1;
                     if (config.discreteColors) {
-                        // Discrete layers (Risk Zones)
+                        // For risk zones, use value as weight
                         var intValue = Math.round(value);
-                        if (config.discreteColors[intValue]) {
-                            elevation = getHexHeight(intValue);
-                            color = hexToRgba(config.discreteColors[intValue]);
-                        } else {
-                            continue;
-                        }
+                        weight = intValue;  // 1, 2, 3, 4, 6, 9
                     } else {
-                        // Continuous layers
-                        elevation = getContinuousHeight(value, config);
-                        var hexColor = getColorForValue(value, config);
-                        color = hexToRgba(hexColor);
+                        // For continuous layers, normalize to 0-1
+                        var normalized = (value - config.domain[0]) / (config.domain[1] - config.domain[0]);
+                        weight = Math.max(0, Math.min(1, normalized));
                     }
                     
-                    if (elevation > 0) {
+                    if (weight > 0) {
                         data.push({
                             position: [lng, lat],
-                            elevation: elevation,
-                            color: color,
+                            weight: weight,
                             value: value
                         });
                     }
@@ -1050,45 +1039,6 @@
             }
             
             return data;
-        }
-
-        // Get hexagon height for discrete values (like CARTO population example)
-        function getHexHeight(value) {
-            var heights = {
-                1: 2000,
-                2: 4000,
-                3: 8000,
-                4: 16000,
-                6: 32000,
-                9: 64000
-            };
-            return heights[value] || 0;
-        }
-
-        // Get height for continuous values
-        function getContinuousHeight(value, config) {
-            var normalized = (value - config.domain[0]) / (config.domain[1] - config.domain[0]);
-            normalized = Math.max(0, Math.min(1, normalized));
-            return normalized * 30000;
-        }
-
-        // Get color for continuous values
-        function getColorForValue(value, config) {
-            var scale = config.mode 
-                ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
-                : chroma.scale(config.colors).domain(config.domain);
-            return scale(value).hex();
-        }
-
-        // Convert hex to RGBA array
-        function hexToRgba(hex) {
-            var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? [
-                parseInt(result[1], 16),
-                parseInt(result[2], 16),
-                parseInt(result[3], 16),
-                255
-            ] : [128, 128, 128, 255];
         }
 
         // Load plague cases from GeoJSON
@@ -1328,7 +1278,7 @@
                     console.error(errorMsg, error);
                     
                     if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
-                        updateStatus('⚠️ CORS Error: You must serve files through a web server!', true);
+                        updateStatus(' CORS Error: You must serve files through a web server!', true);
                         updateStatus('Try using: R servr::httd() or Python http.server', true);
                     }
                 });
@@ -1539,4 +1489,3 @@
     </script>
 </body>
 </html>
-

@@ -380,10 +380,10 @@
     <div class="north-arrow"></div>
     <div id="copy-notification" class="copy-notification"></div>
     <div class="view-3d-control">
-        <button id="view-3d-btn" class="view-3d-btn" onclick="toggle3DView()">Heatmap View</button>
+        <button id="view-3d-btn" class="view-3d-btn" onclick="toggle3DView()">🔥 Heatmap View</button>
     </div>
     <div class="export-control">
-        <button id="export-btn" class="export-btn" onclick="toggleExportMode()">Export Cell Data</button>
+        <button id="export-btn" class="export-btn" onclick="toggleExportMode()">📊 Export Cell Data</button>
     </div>
     <div id="export-instruction" class="export-instruction">
         Click and drag to select area, then export to CSV
@@ -870,13 +870,13 @@
             
             if (is3DView) {
                 btn.classList.add('active');
-                btn.textContent = '2D View';
+                btn.textContent = '🗺️ 2D View';
                 mapDiv.style.display = 'none';
                 deckCanvas.style.display = 'block';
                 initialize3DView();
             } else {
                 btn.classList.remove('active');
-                btn.textContent = 'Heatmap View';
+                btn.textContent = '🔥 Heatmap View';
                 mapDiv.style.display = 'block';
                 deckCanvas.style.display = 'none';
                 document.getElementById('deck-tooltip').style.display = 'none';
@@ -898,6 +898,13 @@
             var georaster = georasters[currentLayer];
             var config = layerConfigs[currentLayer];
             
+            // Only allow heatmap for risk zones and hotspot layers
+            if (currentLayer !== 'risk' && currentLayer !== 'hotspot') {
+                alert('Heatmap view is only available for Risk Zones and Hot Spot Analysis layers');
+                toggle3DView();
+                return;
+            }
+            
             // Convert raster to heatmap points
             var data = rasterToHeatmapPoints(georaster, config);
             
@@ -907,12 +914,12 @@
             var center = map.getCenter();
             var zoom = map.getZoom();
             
-            // Create Deck.gl instance with dark basemap
+            // Create Deck.gl instance with dark basemap WITH LABELS
             var {DeckGL, HeatmapLayer} = deck;
             
             deckgl = new DeckGL({
                 container: 'deck-canvas',
-                mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json',
+                mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
                 initialViewState: {
                     longitude: center.lng,
                     latitude: center.lat,
@@ -929,9 +936,9 @@
                         data: data,
                         getPosition: d => d.position,
                         getWeight: d => d.weight,
-                        radiusPixels: 30,
-                        intensity: 1,
-                        threshold: 0.03,
+                        radiusPixels: 50,
+                        intensity: 2,
+                        threshold: 0.01,
                         colorRange: getHeatmapColors(config),
                         aggregation: 'SUM'
                     })
@@ -955,19 +962,18 @@
                     [128, 0, 38]      // Very dark red
                 ];
             } else {
-                // For continuous layers - convert hex colors to RGB
-                return config.colors.map(hexColor => {
-                    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hexColor);
-                    return result ? [
-                        parseInt(result[1], 16),
-                        parseInt(result[2], 16),
-                        parseInt(result[3], 16)
-                    ] : [128, 128, 128];
-                });
+                // For hotspot - blue to red gradient
+                return [
+                    [5, 113, 176],    // Dark blue (cold spot)
+                    [146, 197, 222],  // Light blue
+                    [247, 247, 247],  // White (not significant)
+                    [244, 165, 130],  // Light red
+                    [202, 0, 32]      // Dark red (hot spot)
+                ];
             }
         }
 
-        // Convert raster to heatmap points with weights
+        // Convert raster to heatmap points - USE ALL CELLS
         function rasterToHeatmapPoints(georaster, config) {
             var data = [];
             var xmin = georaster.xmin;
@@ -980,15 +986,12 @@
             var pixelWidth = (xmax - xmin) / width;
             var pixelHeight = (ymax - ymin) / height;
             
-            // Moderate sampling - heatmap is very efficient
-            var sampleRate = 3;  // Sample every 3rd pixel
-            if (width > 5000 || height > 5000) {
-                sampleRate = 5;
-            } else if (width < 1000 && height < 1000) {
-                sampleRate = 2;
-            }
+            // NO SAMPLING - use every cell for accurate representation
+            var sampleRate = 1;
             
-            console.log('Raster size:', width, 'x', height, 'Sample rate: 1 in', sampleRate);
+            console.log('Raster size:', width, 'x', height, 'Using ALL cells (no sampling)');
+            
+            var validCount = 0;
             
             for (var row = 0; row < height; row += sampleRate) {
                 for (var col = 0; col < width; col += sampleRate) {
@@ -1021,11 +1024,10 @@
                     if (config.discreteColors) {
                         // For risk zones, use value as weight
                         var intValue = Math.round(value);
-                        weight = intValue;  // 1, 2, 3, 4, 6, 9
+                        weight = intValue * 2;  // Amplify the weight
                     } else {
-                        // For continuous layers, normalize to 0-1
-                        var normalized = (value - config.domain[0]) / (config.domain[1] - config.domain[0]);
-                        weight = Math.max(0, Math.min(1, normalized));
+                        // For hotspot, use absolute value (hot and cold spots)
+                        weight = Math.abs(value) + 1;
                     }
                     
                     if (weight > 0) {
@@ -1034,9 +1036,12 @@
                             weight: weight,
                             value: value
                         });
+                        validCount++;
                     }
                 }
             }
+            
+            console.log('Created', validCount, 'heatmap points from', width * height, 'total cells');
             
             return data;
         }
@@ -1278,7 +1283,7 @@
                     console.error(errorMsg, error);
                     
                     if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
-                        updateStatus(' CORS Error: You must serve files through a web server!', true);
+                        updateStatus('⚠️ CORS Error: You must serve files through a web server!', true);
                         updateStatus('Try using: R servr::httd() or Python http.server', true);
                     }
                 });
@@ -1489,3 +1494,4 @@
     </script>
 </body>
 </html>
+

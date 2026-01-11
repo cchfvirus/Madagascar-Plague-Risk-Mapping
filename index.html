@@ -898,10 +898,10 @@
             var georaster = georasters[currentLayer];
             var config = layerConfigs[currentLayer];
             
-            // Convert raster to 3D hexagon data
-            var data = rasterTo3DHexagons(georaster, config);
+            // Convert raster to point data (will be aggregated by HexagonLayer)
+            var data = rasterToPoints(georaster, config);
             
-            console.log('Generated ' + data.length + ' hexagons for 3D view');
+            console.log('Generated ' + data.length + ' points for hexagon aggregation');
             
             // Get map center and zoom
             var center = map.getCenter();
@@ -927,40 +927,43 @@
                     new HexagonLayer({
                         id: '3d-hexagons',
                         data: data,
-                        radius: 100,
-                        elevationScale: 1,
-                        extruded: true,
-                        coverage: 0.95,
                         getPosition: d => [d.lng, d.lat],
-                        getElevation: d => d.height,
-                        getFillColor: d => d.color,
+                        getElevationWeight: d => d.weight,
+                        getColorWeight: d => d.weight,
+                        elevationScale: config.discreteColors ? 50 : 30,
+                        extruded: true,
+                        radius: 200,
+                        coverage: 0.9,
+                        upperPercentile: 100,
+                        colorRange: getColorRangeForLayer(config),
+                        elevationRange: [0, config.discreteColors ? 5000 : 3000],
                         pickable: true,
                         autoHighlight: true,
-                        highlightColor: [255, 255, 255, 100],
-                        onHover: (info) => updateTooltip(info)
+                        onHover: (info) => updateTooltip3D(info, config)
                     })
                 ]
             });
         }
 
-        // Update tooltip on hover
-        function updateTooltip(info) {
+        // Update tooltip for aggregated hexagons
+        function updateTooltip3D(info, config) {
             var tooltip = document.getElementById('deck-tooltip');
             
             if (info.object) {
-                var config = layerConfigs[currentLayer];
-                var value = info.object.value;
-                var displayValue;
+                var count = info.object.points ? info.object.points.length : 0;
+                var avgValue = 0;
                 
-                if (config.discreteDisplay) {
-                    displayValue = Math.round(value);
-                } else {
-                    displayValue = value.toFixed(4);
+                if (info.object.points && info.object.points.length > 0) {
+                    var sum = 0;
+                    info.object.points.forEach(p => { sum += p.source.value; });
+                    avgValue = sum / info.object.points.length;
                 }
                 
+                var displayValue = config.discreteDisplay ? Math.round(avgValue) : avgValue.toFixed(2);
+                
                 tooltip.innerHTML = '<strong>' + config.name + '</strong><br/>' +
-                                   'Value: ' + displayValue + '<br/>' +
-                                   'Height: ' + Math.round(info.object.height) + 'm';
+                                   'Cells in hexagon: ' + count + '<br/>' +
+                                   'Average value: ' + displayValue;
                 tooltip.style.display = 'block';
                 tooltip.style.left = info.x + 10 + 'px';
                 tooltip.style.top = info.y + 10 + 'px';
@@ -969,8 +972,36 @@
             }
         }
 
-        // Convert raster data to 3D hexagon format
-        function rasterTo3DHexagons(georaster, config) {
+        // Get color range for layer
+        function getColorRangeForLayer(config) {
+            if (config.discreteColors) {
+                // For risk zones - use discrete colors
+                return [
+                    hexToRgbArray(config.discreteColors[1] || '#FFFFBE'),
+                    hexToRgbArray(config.discreteColors[2] || '#FFDD00'),
+                    hexToRgbArray(config.discreteColors[3] || '#FFAA00'),
+                    hexToRgbArray(config.discreteColors[4] || '#FF6600'),
+                    hexToRgbArray(config.discreteColors[6] || '#FF0000'),
+                    hexToRgbArray(config.discreteColors[9] || '#A80000')
+                ];
+            } else {
+                // For continuous layers - use gradient
+                return config.colors.map(c => hexToRgbArray(c));
+            }
+        }
+
+        // Convert hex to RGB array (without alpha)
+        function hexToRgbArray(hex) {
+            var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? [
+                parseInt(result[1], 16),
+                parseInt(result[2], 16),
+                parseInt(result[3], 16)
+            ] : [128, 128, 128];
+        }
+
+        // Convert raster to simple points for hexagon aggregation
+        function rasterToPoints(georaster, config) {
             var data = [];
             var xmin = georaster.xmin;
             var xmax = georaster.xmax;
@@ -982,11 +1013,12 @@
             var pixelWidth = (xmax - xmin) / width;
             var pixelHeight = (ymax - ymin) / height;
             
-            // Sample rate - adjust based on raster size for performance
-            // For 100m layers, sample every pixel at high zoom
+            // Adaptive sampling based on raster size
             var sampleRate = 1;
-            if (width > 2000) {
-                sampleRate = Math.max(1, Math.floor(width / 2000));
+            if (width > 5000 || height > 5000) {
+                sampleRate = 2;
+            } else if (width > 2000 || height > 2000) {
+                sampleRate = 1;
             }
             
             console.log('Raster size:', width, 'x', height, 'Sample rate:', sampleRate);
@@ -995,7 +1027,7 @@
                 for (var col = 0; col < width; col += sampleRate) {
                     var value = georaster.values[0][row][col];
                     
-                    // Check georaster's noDataValue
+                    // Check noDataValue
                     if (georaster.noDataValue !== null && georaster.noDataValue !== undefined && !isNaN(georaster.noDataValue)) {
                         if (Math.abs(value - georaster.noDataValue) < 0.0001) {
                             continue;
@@ -1009,7 +1041,7 @@
                         continue;
                     }
                     
-                    // For risk zones, skip value 0 (no risk)
+                    // For risk zones, skip value 0
                     if (config.discreteColors && Math.round(value) === 0) {
                         continue;
                     }
@@ -1017,68 +1049,24 @@
                     var lng = xmin + (col + 0.5) * pixelWidth;
                     var lat = ymax - (row + 0.5) * pixelHeight;
                     
-                    // Calculate height and color based on layer type
-                    var hexHeight = 0;
-                    var color = [128, 128, 128, 200];
-                    
+                    // Weight determines both height and color intensity
+                    var weight = value;
                     if (config.discreteColors) {
-                        // Discrete layers (Risk Zones)
+                        // For discrete values, use exponential weighting
                         var intValue = Math.round(value);
-                        if (config.discreteColors[intValue]) {
-                            hexHeight = getHeightForDiscreteValue(intValue);
-                            color = hexToRgb(config.discreteColors[intValue]);
-                        } else {
-                            continue; // Skip values not in discrete set
-                        }
-                    } else {
-                        // Continuous layers (ENM, Hotspot, LandScan)
-                        hexHeight = getHeightForContinuousValue(value, config);
-                        var hexColor = getColorForValue(value, config);
-                        color = hexToRgb(hexColor);
+                        weight = Math.pow(2, intValue); // 1→2, 2→4, 3→8, 4→16, 6→64, 9→512
                     }
                     
-                    if (hexHeight > 0) {
-                        data.push({
-                            lng: lng,
-                            lat: lat,
-                            height: hexHeight,
-                            color: color,
-                            value: value
-                        });
-                    }
+                    data.push({
+                        lng: lng,
+                        lat: lat,
+                        value: value,
+                        weight: weight
+                    });
                 }
             }
             
             return data;
-        }
-
-        // Get height for discrete values (Risk Zones)
-        function getHeightForDiscreteValue(value) {
-            var heights = {
-                0: 0,       // No height for no risk
-                1: 200,     // 200m
-                2: 400,     // 400m
-                3: 800,     // 800m
-                4: 1600,    // 1600m
-                6: 3200,    // 3200m
-                9: 6400     // 6400m - Very dramatic!
-            };
-            return heights[value] || 0;
-        }
-
-        // Get height for continuous values
-        function getHeightForContinuousValue(value, config) {
-            var normalized = (value - config.domain[0]) / (config.domain[1] - config.domain[0]);
-            normalized = Math.max(0, Math.min(1, normalized));
-            return normalized * 3000; // Max height 3000m
-        }
-
-        // Get color for continuous values
-        function getColorForValue(value, config) {
-            var scale = config.mode 
-                ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
-                : chroma.scale(config.colors).domain(config.domain);
-            return scale(value).hex();
         }
 
         // Convert hex color to RGB array
@@ -1088,7 +1076,7 @@
                 parseInt(result[1], 16),
                 parseInt(result[2], 16),
                 parseInt(result[3], 16),
-                220 // Alpha - slightly more opaque
+                220
             ] : [128, 128, 128, 220];
         }
 

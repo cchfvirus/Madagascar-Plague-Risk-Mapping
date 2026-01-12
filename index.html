@@ -845,8 +845,8 @@
                     updateLegend(currentLayer);
                 })
                 .catch(error => {
-                    console.error('Error loading plague cases:', error);
-                    updateStatus('Note: Plague cases layer not available', false);
+                    console.log('Plague cases file not found - layer will not be available');
+                    // Fail silently - no status message shown to user
                 });
         }
 
@@ -904,8 +904,8 @@
                     highRiskBoundariesLayer.addTo(map);
                 })
                 .catch(error => {
-                    console.error('Error loading high risk boundaries:', error);
-                    updateStatus('Note: High risk boundaries layer not available', false);
+                    console.log('High risk boundaries file not found - layer will not be available');
+                    // Fail silently - no status message shown to user
                 });
         }
 

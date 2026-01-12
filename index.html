@@ -951,11 +951,12 @@
                         data: data,
                         getPosition: d => d.position,
                         getWeight: d => d.weight,
-                        radiusPixels: 50,
-                        intensity: 2,
-                        threshold: 0.01,
+                        radiusPixels: 80,  // Much larger radius for smooth interpolation
+                        intensity: 3,      // Higher intensity
+                        threshold: 0.005,  // Lower threshold to show more gradient
                         colorRange: getHeatmapColors(config),
-                        aggregation: 'SUM'
+                        aggregation: 'SUM',
+                        weightsTextureSize: 512  // Higher resolution texture
                     })
                 ]
             });

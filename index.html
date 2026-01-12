@@ -1015,9 +1015,12 @@
                         continue;
                     }
                     
-                    // For risk zones, skip value 0
-                    if (config.discreteColors && Math.round(value) === 0) {
-                        continue;
+                    // For risk zones, skip values 0, 1, 2, 3 - only show 4, 6, 9
+                    if (config.discreteColors) {
+                        var intValue = Math.round(value);
+                        if (intValue === 0 || intValue === 1 || intValue === 2 || intValue === 3) {
+                            continue;
+                        }
                     }
                     
                     var lng = xmin + (col + 0.5) * pixelWidth;

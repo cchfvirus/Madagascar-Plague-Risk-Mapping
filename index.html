@@ -367,7 +367,7 @@
         var georasters = {};
         var currentLayer = null;
         var loadedCount = 0;
-        var totalLayers = 4;
+        var totalLayers = 5;
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
         var isExportMode = false;
@@ -383,6 +383,15 @@
                 labels: ['Low Suitability', 'High Suitability'],
                 description: '',
                 mode: 'lch',
+                continuousLegend: true
+            },
+            'enm_uncertainty': {
+                file: 'enm_uncertainty_cog.tif',
+                name: 'ENM Uncertainty',
+                colors: ['#f7f4f9', '#e7e1ef', '#d4b9da', '#c994c7', '#df65b0', '#e7298a', '#ce1256', '#980043', '#67001f'],
+                domain: [0, 1],
+                labels: ['Low Uncertainty', 'High Uncertainty'],
+                description: 'Ecological niche model uncertainty metric',
                 continuousLegend: true
             },
             'risk': {
@@ -1239,3 +1248,4 @@
     </script>
 </body>
 </html>
+

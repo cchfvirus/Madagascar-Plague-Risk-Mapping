@@ -367,7 +367,7 @@
         var georasters = {};
         var currentLayer = null;
         var loadedCount = 0;
-        var totalLayers = 5;
+        var totalLayers = 4;
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
         var isExportMode = false;
@@ -381,16 +381,6 @@
                 colors: ['#808080', '#ffed6f', '#ffc100', '#ff8c00', '#ff4500', '#dc143c', '#8b0000'],
                 domain: [0, 1],
                 labels: ['Low Suitability', 'High Suitability'],
-                description: '',
-                mode: 'lch',
-                continuousLegend: true
-            },
-            'enm_uncertainty': {
-                file: 'enm_uncertainty_cog.tif',
-                name: 'Ecological Niche Model (Uncertainty)',
-                colors: ['#bcbddc', '#9e9ac8', '#807dba', '#6a51a3', '#54278f', '#3f007d', '#2d004d'],
-                domain: [0, 0.31],
-                labels: ['Low Uncertainty', 'High Uncertainty'],
                 description: '',
                 mode: 'lch',
                 continuousLegend: true
@@ -855,8 +845,8 @@
                     updateLegend(currentLayer);
                 })
                 .catch(error => {
-                    console.log('Plague cases file not found - layer will not be available');
-                    // Fail silently - no status message shown to user
+                    console.error('Error loading plague cases:', error);
+                    updateStatus('Note: Plague cases layer not available', false);
                 });
         }
 
@@ -914,8 +904,8 @@
                     highRiskBoundariesLayer.addTo(map);
                 })
                 .catch(error => {
-                    console.log('High risk boundaries file not found - layer will not be available');
-                    // Fail silently - no status message shown to user
+                    console.error('Error loading high risk boundaries:', error);
+                    updateStatus('Note: High risk boundaries layer not available', false);
                 });
         }
 

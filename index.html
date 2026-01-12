@@ -381,7 +381,7 @@
     <div class="north-arrow"></div>
     <div id="copy-notification" class="copy-notification"></div>
     <div class="view-3d-control">
-        <button id="view-3d-btn" class="view-3d-btn" onclick="toggle3DView()">🔥 Heatmap View</button>
+        <button id="view-3d-btn" class="view-3d-btn" onclick="toggle3DView()">📊 Contour View</button>
     </div>
     <div class="export-control">
         <button id="export-btn" class="export-btn" onclick="toggleExportMode()">📊 Export Cell Data</button>
@@ -658,14 +658,14 @@
             }
         }
 
-        // Show/hide heatmap button based on layer
+        // Show/hide contour button based on layer
         function updateHeatmapButtonVisibility() {
             var heatmapBtn = document.querySelector('.view-3d-control');
             if (currentLayer === 'risk') {
                 heatmapBtn.style.display = 'block';
             } else {
                 heatmapBtn.style.display = 'none';
-                // If heatmap is active on a non-risk layer, switch back to 2D
+                // If contour is active on a non-risk layer, switch back to 2D
                 if (is3DView) {
                     toggle3DView();
                 }
@@ -891,7 +891,7 @@
                 initialize3DView();
             } else {
                 btn.classList.remove('active');
-                btn.textContent = '🔥 Heatmap View';
+                btn.textContent = '📊 Contour View';
                 mapDiv.style.display = 'block';
                 deckCanvas.style.display = 'none';
                 document.getElementById('deck-tooltip').style.display = 'none';
@@ -915,7 +915,7 @@
             
             // Only allow heatmap for risk zones layer
             if (currentLayer !== 'risk') {
-                alert('Heatmap view is only available for the Risk Zones layer');
+                alert('Contour view is only available for the Risk Zones layer');
                 toggle3DView();
                 return;
             }
@@ -930,7 +930,7 @@
             var zoom = map.getZoom();
             
             // Create Deck.gl instance with dark basemap WITH LABELS
-            var {DeckGL, HeatmapLayer} = deck;
+            var {DeckGL, ContourLayer} = deck;
             
             deckgl = new DeckGL({
                 container: 'deck-canvas',
@@ -946,18 +946,20 @@
                 },
                 controller: true,
                 layers: [
-                    new HeatmapLayer({
-                        id: 'heatmap-layer',
+                    new ContourLayer({
+                        id: 'contour-layer',
                         data: data,
                         getPosition: d => d.position,
                         getWeight: d => d.weight,
-                        radiusPixels: 80,  // Much larger radius for smooth interpolation
-                        intensity: 3,      // Higher intensity
-                        threshold: 0.005,  // Lower threshold to show more gradient
-                        colorRange: getHeatmapColors(config),
-                        aggregation: 'SUM',
-                        weightsTextureSize: 512,  // Higher resolution texture
-                        opacity: 0.7  // 70% opacity for transparency
+                        contours: [
+                            {threshold: 6, color: [255, 255, 190, 180]},   // Light yellow - value 3
+                            {threshold: 8, color: [254, 217, 118, 200]},   // Orange - value 4
+                            {threshold: 12, color: [252, 78, 42, 220]},    // Red - value 6
+                            {threshold: 18, color: [165, 0, 38, 240]}      // Dark red - value 9
+                        ],
+                        cellSize: 100,
+                        aggregation: 'MEAN',
+                        opacity: 0.7
                     })
                 ]
             });

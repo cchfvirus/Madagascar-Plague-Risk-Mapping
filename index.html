@@ -7,7 +7,6 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
-    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.css" />
     
     <style>
         body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
@@ -312,62 +311,6 @@
             max-width: 300px;
             text-align: center;
         }
-        
-        /* 3D View button */
-        .view-3d-control {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(calc(-50% - 110px));
-            z-index: 1000;
-            display: none;  /* Hidden by default, shown only for risk zones */
-        }
-        
-        .view-3d-btn {
-            background: white;
-            border: 2px solid #ccc;
-            border-radius: 5px;
-            padding: 10px 15px;
-            cursor: pointer;
-            font-size: 13px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
-            transition: all 0.3s;
-        }
-        
-        .view-3d-btn:hover {
-            background: #f0f0f0;
-            border-color: #999;
-        }
-        
-        .view-3d-btn.active {
-            background: #2196F3;
-            color: white;
-            border-color: #2196F3;
-        }
-        
-        /* 3D Canvas */
-        #deck-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: none;
-        }
-        
-        /* 3D Tooltip */
-        #deck-tooltip {
-            position: absolute;
-            padding: 8px 12px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            font-size: 12px;
-            border-radius: 4px;
-            pointer-events: none;
-            z-index: 10000;
-            display: none;
-            white-space: nowrap;
-        }
     </style>
 </head>
 <body>
@@ -376,13 +319,8 @@
         <div id="load-status" style="margin-top: 10px; font-size: 12px;"></div>
     </div>
     <div id="map"></div>
-    <div id="deck-canvas"></div>
-    <div id="deck-tooltip"></div>
     <div class="north-arrow"></div>
     <div id="copy-notification" class="copy-notification"></div>
-    <div class="view-3d-control">
-        <button id="view-3d-btn" class="view-3d-btn" onclick="toggle3DView()">📊 Contour View</button>
-    </div>
     <div class="export-control">
         <button id="export-btn" class="export-btn" onclick="toggleExportMode()">📊 Export Cell Data</button>
     </div>
@@ -395,8 +333,6 @@
     <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-    <script src="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.js"></script>
-    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
 
     <script>
         // Initialize map - centered on Antananarivo region (central Madagascar) with zoom 10
@@ -436,8 +372,6 @@
         var highRiskBoundariesLayer = null;
         var isExportMode = false;
         var exportRectangle = null;
-        var is3DView = false;
-        var deckgl = null;
 
         // Layer configurations
         var layerConfigs = {
@@ -658,20 +592,6 @@
             }
         }
 
-        // Show/hide contour button based on layer
-        function updateHeatmapButtonVisibility() {
-            var heatmapBtn = document.querySelector('.view-3d-control');
-            if (currentLayer === 'risk') {
-                heatmapBtn.style.display = 'block';
-            } else {
-                heatmapBtn.style.display = 'none';
-                // If contour is active on a non-risk layer, switch back to 2D
-                if (is3DView) {
-                    toggle3DView();
-                }
-            }
-        }
-
         // Function to get raster value at a point
         function getRasterValueAtPoint(layerId, latlng) {
             if (!georasters[layerId]) {
@@ -874,206 +794,6 @@
             }
             
             alert('Successfully exported ' + count + ' cells to ' + filename);
-        }
-
-        // Toggle 3D view
-        function toggle3DView() {
-            is3DView = !is3DView;
-            var btn = document.getElementById('view-3d-btn');
-            var mapDiv = document.getElementById('map');
-            var deckCanvas = document.getElementById('deck-canvas');
-            
-            if (is3DView) {
-                btn.classList.add('active');
-                btn.textContent = '🗺️ 2D View';
-                mapDiv.style.display = 'none';
-                deckCanvas.style.display = 'block';
-                initialize3DView();
-            } else {
-                btn.classList.remove('active');
-                btn.textContent = '📊 Contour View';
-                mapDiv.style.display = 'block';
-                deckCanvas.style.display = 'none';
-                document.getElementById('deck-tooltip').style.display = 'none';
-                if (deckgl) {
-                    deckgl.finalize();
-                    deckgl = null;
-                }
-            }
-        }
-
-        // Initialize 3D view with Deck.gl and MapLibre basemap
-        function initialize3DView() {
-            if (!currentLayer || !georasters[currentLayer]) {
-                alert('Please wait for layers to load');
-                toggle3DView();
-                return;
-            }
-            
-            var georaster = georasters[currentLayer];
-            var config = layerConfigs[currentLayer];
-            
-            // Only allow heatmap for risk zones layer
-            if (currentLayer !== 'risk') {
-                alert('Contour view is only available for the Risk Zones layer');
-                toggle3DView();
-                return;
-            }
-            
-            // Convert raster to heatmap points
-            var data = rasterToHeatmapPoints(georaster, config);
-            
-            console.log('Generated ' + data.length + ' points for heatmap');
-            
-            // Debug: Check weight range
-            if (data.length > 0) {
-                var weights = data.map(d => d.weight);
-                var minWeight = Math.min(...weights);
-                var maxWeight = Math.max(...weights);
-                console.log('Weight range:', minWeight, 'to', maxWeight);
-                console.log('Sample data:', data.slice(0, 5));
-            }
-            
-            // Get map center and zoom
-            var center = map.getCenter();
-            var zoom = map.getZoom();
-            
-            // Create Deck.gl instance with dark basemap WITH LABELS
-            var {DeckGL, ContourLayer} = deck;
-            
-            deckgl = new DeckGL({
-                container: 'deck-canvas',
-                mapStyle: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-                initialViewState: {
-                    longitude: center.lng,
-                    latitude: center.lat,
-                    zoom: zoom,
-                    pitch: 0,
-                    bearing: 0,
-                    maxZoom: 20,
-                    minZoom: 5
-                },
-                controller: true,
-                layers: [
-                    // Filled contour polygons
-                    new ContourLayer({
-                        id: 'contour-fill',
-                        data: data,
-                        getPosition: d => d.position,
-                        getWeight: d => d.weight,
-                        contours: [
-                            {threshold: [1, 7], color: [254, 224, 139, 150]},   // Value 3 (weight 6) - Yellow
-                            {threshold: [7, 10], color: [253, 174, 97, 170]},   // Value 4 (weight 8) - Orange
-                            {threshold: [10, 15], color: [244, 109, 67, 190]},  // Value 6 (weight 12) - Red-orange
-                            {threshold: [15, 25], color: [213, 62, 79, 210]}    // Value 9 (weight 18) - Dark red
-                        ],
-                        cellSize: 50,
-                        aggregation: 'SUM',
-                        gpuAggregation: true
-                    }),
-                    // White contour lines
-                    new ContourLayer({
-                        id: 'contour-lines',
-                        data: data,
-                        getPosition: d => d.position,
-                        getWeight: d => d.weight,
-                        contours: [
-                            {threshold: 7, color: [255, 255, 255, 0], strokeWidth: 2},
-                            {threshold: 10, color: [255, 255, 255, 0], strokeWidth: 2},
-                            {threshold: 15, color: [255, 255, 255, 0], strokeWidth: 3}
-                        ],
-                        cellSize: 50,
-                        aggregation: 'SUM',
-                        gpuAggregation: true
-                    })
-                ]
-            });
-        }
-
-        // Get heatmap color range for risk zones
-        function getHeatmapColors(config) {
-            // Yellow to red gradient for risk zones
-            return [
-                [255, 255, 204],  // Light yellow
-                [255, 237, 160],  // Yellow
-                [254, 217, 118],  // Light orange
-                [254, 178, 76],   // Orange
-                [253, 141, 60],   // Dark orange
-                [252, 78, 42],    // Red-orange
-                [227, 26, 28],    // Red
-                [189, 0, 38],     // Dark red
-                [128, 0, 38]      // Very dark red
-            ];
-        }
-
-        // Convert raster to heatmap points - USE ALL CELLS
-        function rasterToHeatmapPoints(georaster, config) {
-            var data = [];
-            var xmin = georaster.xmin;
-            var xmax = georaster.xmax;
-            var ymin = georaster.ymin;
-            var ymax = georaster.ymax;
-            var width = georaster.width;
-            var height = georaster.height;
-            
-            var pixelWidth = (xmax - xmin) / width;
-            var pixelHeight = (ymax - ymin) / height;
-            
-            // NO SAMPLING - use every cell for accurate representation
-            var sampleRate = 1;
-            
-            console.log('Raster size:', width, 'x', height, 'Using ALL cells (no sampling)');
-            
-            var validCount = 0;
-            
-            for (var row = 0; row < height; row += sampleRate) {
-                for (var col = 0; col < width; col += sampleRate) {
-                    var value = georaster.values[0][row][col];
-                    
-                    // Check noDataValue
-                    if (georaster.noDataValue !== null && georaster.noDataValue !== undefined && !isNaN(georaster.noDataValue)) {
-                        if (Math.abs(value - georaster.noDataValue) < 0.0001) {
-                            continue;
-                        }
-                    }
-                    
-                    // Skip common NoData values
-                    if (value === null || value === undefined || isNaN(value) ||
-                        value === 255 || value === -9999 || value === -3.4e38 ||
-                        Math.abs(value) > 1e10 || value === -32768) {
-                        continue;
-                    }
-                    
-                    // For risk zones, skip values 0, 1, 2 - only show 3, 4, 6, 9
-                    if (config.discreteColors) {
-                        var intValue = Math.round(value);
-                        if (intValue === 0 || intValue === 1 || intValue === 2) {
-                            continue;
-                        }
-                    }
-                    
-                    var lng = xmin + (col + 0.5) * pixelWidth;
-                    var lat = ymax - (row + 0.5) * pixelHeight;
-                    
-                    // Calculate weight for heatmap (risk zones only)
-                    var weight = 1;
-                    var intValue = Math.round(value);
-                    weight = intValue * 2;  // Amplify the weight (1→2, 2→4, 3→6, etc.)
-                    
-                    if (weight > 0) {
-                        data.push({
-                            position: [lng, lat],
-                            weight: weight,
-                            value: value
-                        });
-                        validCount++;
-                    }
-                }
-            }
-            
-            console.log('Created', validCount, 'heatmap points from', width * height, 'total cells');
-            
-            return data;
         }
 
         // Load plague cases from GeoJSON
@@ -1299,7 +1019,6 @@
                         currentLayer = layerId;
                         updateLegend(layerId);
                         updateHighRiskBoundaryStyle();
-                        updateHeatmapButtonVisibility();
                     }
                     
                     if (loadedCount === totalLayers) {
@@ -1330,12 +1049,6 @@
                 currentLayer = layerId;
                 updateLegend(layerId);
                 updateHighRiskBoundaryStyle();
-                updateHeatmapButtonVisibility();
-                
-                // Update 3D view if active
-                if (is3DView && deckgl) {
-                    initialize3DView();
-                }
             }
         }
 

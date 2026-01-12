@@ -1015,10 +1015,10 @@
                         continue;
                     }
                     
-                    // For risk zones, skip values 0, 1, 2, 3 - only show 4, 6, 9
+                    // For risk zones, skip values 0, 1, 2 - only show 3, 4, 6, 9
                     if (config.discreteColors) {
                         var intValue = Math.round(value);
-                        if (intValue === 0 || intValue === 1 || intValue === 2 || intValue === 3) {
+                        if (intValue === 0 || intValue === 1 || intValue === 2) {
                             continue;
                         }
                     }

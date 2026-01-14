@@ -24,16 +24,23 @@ Plague continues to cause deadly outbreaks in Madagascar, yet health officials l
 Interactive Tools
 
 🖱️ Click to inspect: Left-click any location to view raster cell values
+
 📍 Coordinate copying: Right-click to copy coordinates to clipboard
+
 📏 Measurement tools: Draw polylines and polygons to measure distance and area
+
 🎚️ Layer controls: Toggle between layers with customizable opacity (ENM/Risk: 50%, Hotspot: 100% default)
+
 🗺️ Basemap options: Switch between street map and satellite imagery
 
 🔧 Technologies
 
 Leaflet.js (v1.9.4): Interactive mapping
+
 georaster-layer-for-leaflet (v3.10.0): Raster layer rendering
+
 Chroma.js (v2.4.2): Color scale generation
+
 Leaflet.draw (v1.0.4): Measurement tools
 
 📝 Citation

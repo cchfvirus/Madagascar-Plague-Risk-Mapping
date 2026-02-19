@@ -812,7 +812,17 @@
                     
                     updateStatus(config.name + ' ready! (' + loadedCount + '/' + totalLayers + ')');
                     
-                    if (!currentLayer) {
+                    if (layerId === 'enm') {
+                        // ENM is always the default layer
+                        if (currentLayer && layers[currentLayer]) {
+                            map.removeLayer(layers[currentLayer]);
+                        }
+                        layer.addTo(map);
+                        currentLayer = 'enm';
+                        updateLegend('enm');
+                        updateHighRiskBoundaryStyle();
+                    } else if (!currentLayer) {
+                        // Only show another layer if ENM hasn't loaded yet
                         layer.addTo(map);
                         currentLayer = layerId;
                         updateLegend(layerId);

@@ -315,7 +315,7 @@
         var georasters = {};
         var currentLayer = null;
         var loadedCount = 0;
-        var totalLayers = 3;
+        var totalLayers = 4;
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
 
@@ -375,6 +375,15 @@
                     { value: -1.96, color: '#92c5de', label: 'Cold Spot with 95% Confidence' },
                     { value: -2.58, color: '#0571b0', label: 'Cold Spot with 99% Confidence' }
                 ]
+            },
+            'elevation': {
+                file: 'elevation.tif',
+                name: 'Elevation (DEM)',
+                colors: ['#FFFFFF', '#000000'],
+                domain: [0, 2747],
+                labels: ['Low Elevation', 'High Elevation'],
+                description: 'Digital Elevation Model - White (low) to Black (high)',
+                continuousLegend: true
             }
         };
 
@@ -652,8 +661,8 @@
 
         function updateHighRiskBoundaryStyle() {
             if (highRiskBoundariesLayer) {
-                // Black boundaries for ENM and Hotspot layers, white for Risk layer
-                var boundaryColor = (currentLayer === 'hotspot' || currentLayer === 'enm') ? '#000000' : '#FFFFFF';
+                // Black boundaries for ENM, Hotspot, and Elevation layers, white for Risk layer
+                var boundaryColor = (currentLayer === 'risk') ? '#FFFFFF' : '#000000';
                 
                 highRiskBoundariesLayer.setStyle({
                     fillColor: 'transparent',
@@ -676,8 +685,8 @@
                 .then(data => {
                     updateStatus('Loaded high risk boundaries');
                     
-                    // Initial color based on current layer (black for ENM and hotspot, white for risk)
-                    var initialColor = (currentLayer === 'hotspot' || currentLayer === 'enm') ? '#000000' : '#FFFFFF';
+                    // Initial color based on current layer (black for ENM, hotspot, elevation; white for risk)
+                    var initialColor = (currentLayer === 'risk') ? '#FFFFFF' : '#000000';
                     
                     highRiskBoundariesLayer = L.geoJSON(data, {
                         style: {
@@ -777,7 +786,7 @@
                             return null;
                         };
                     } else {
-                        // For continuous layers (ENM, Hotspot)
+                        // For continuous layers (ENM, Hotspot, Elevation)
                         var scale = config.mode 
                             ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
                             : chroma.scale(config.colors).domain(config.domain);
@@ -1000,16 +1009,22 @@
                     // For discrete layers (risk, hotspot), show integer
                     displayValue = Math.round(value).toString();
                 } else {
-                    // For continuous layers (ENM), show 4 decimal places
+                    // For continuous layers (ENM, Elevation), show 4 decimal places
                     displayValue = value.toFixed(4);
                 }
             } else {
                 displayValue = 'No Data';
             }
             
+            // Add unit suffix for elevation
+            var unitSuffix = '';
+            if (currentLayer === 'elevation' && value !== null) {
+                unitSuffix = ' m';
+            }
+            
             var popupContent = '<h3>' + config.name + '</h3><table>';
             popupContent += '<tr><td>Coordinates</td><td>' + e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6) + '</td></tr>';
-            popupContent += '<tr><td>Cell Value</td><td>' + displayValue + '</td></tr>';
+            popupContent += '<tr><td>Cell Value</td><td>' + displayValue + unitSuffix + '</td></tr>';
             popupContent += '</table>';
             
             L.popup()

@@ -380,7 +380,7 @@
                 file: 'elevation.tif',
                 name: 'Elevation (DEM)',
                 colors: ['#FFFFFF', '#000000'],
-                domain: [0, 2747],
+                domain: [0, 2500],
                 labels: ['Low Elevation', 'High Elevation'],
                 description: 'Digital Elevation Model - White (low) to Black (high)',
                 continuousLegend: true
@@ -609,13 +609,12 @@
                     
                     plagueCasesLayer = L.geoJSON(data, {
                         pointToLayer: function(feature, latlng) {
-                            return L.marker(latlng, {
-                                icon: L.divIcon({
-                                    className: 'custom-div-icon',
-                                    html: "<div style='font-size:24px;font-weight:bold;color:#1e88e5;text-shadow:1px 1px 2px #FFF, -1px -1px 2px #FFF, 1px -1px 2px #FFF, -1px 1px 2px #FFF;'>✚</div>",
-                                    iconSize: [24, 24],
-                                    iconAnchor: [12, 12]
-                                })
+                            return L.circleMarker(latlng, {
+                                color: '#FFFFFF',
+                                fillColor: '#0096FF',
+                                fillOpacity: 1,
+                                radius: 7,
+                                weight: 1
                             });
                         },
                         onEachFeature: function(feature, layer) {
@@ -907,7 +906,7 @@
                 legendDiv.innerHTML += 
                     '<div class="plague-cases-section">' +
                     '<div class="item">' +
-                    '<span class="plague-case-symbol">✚</span>' +
+                    '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#0096FF;border:1px solid #FFFFFF;margin-right:8px;vertical-align:middle;"></span>' +
                     '<span style="font-size:11px;">Plague Cases</span>' +
                     '</div>' +
                     '</div>';
@@ -942,12 +941,12 @@
             div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">High-Risk Regions</label>';
             div.innerHTML += '</div>';
             
-            // Opacity sliders section - All layers default to 50%
+            // Opacity sliders section - All layers default to 60%
             div.innerHTML += '<div class="opacity-section">';
             div.innerHTML += '<h5>Layer Opacity</h5>';
             
             Object.keys(layerConfigs).forEach(function(key) {
-                var defaultOpacity = 0.5;
+                var defaultOpacity = 0.6;
                 div.innerHTML += 
                     '<div class="opacity-control">' +
                     '<label>' + layerConfigs[key].name + ' <span class="opacity-value" id="opacity-value-' + key + '">' + Math.round(defaultOpacity * 100) + '%</span></label>' +
@@ -1044,4 +1043,3 @@
     </script>
 </body>
 </html>
-

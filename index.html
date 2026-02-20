@@ -348,7 +348,8 @@
         // Track hidden classes per layer (for toggleable legend items)
         var hiddenClasses = {
             'risk': {},
-            'hotspot': {}
+            'hotspot': {},
+            'elevation': {}
         };
 
         // Layer configurations
@@ -411,11 +412,20 @@
             'elevation': {
                 file: 'elevation.tif',
                 name: 'Elevation (DEM)',
-                colors: ['#FFFFFF', '#000000'],
-                domain: [1, 2500],
+                domain: [0, 2747],
                 labels: ['Low Elevation', 'High Elevation'],
-                description: 'Digital Elevation Model - White (low) to Black (high)',
-                continuousLegend: true
+                description: 'Digital Elevation Model (meters)',
+                customLegend: true,
+                discreteDisplay: false,
+                elevationBreaks: [226.22, 560.17, 915.67, 1314.25, 2747],
+                elevationColors: ['#FFFFFF', '#BFBFBF', '#808080', '#404040', '#000000'],
+                legendItems: [
+                    { value: 1, color: '#FFFFFF', label: '0 – 226 m' },
+                    { value: 2, color: '#BFBFBF', label: '226 – 560 m' },
+                    { value: 3, color: '#808080', label: '560 – 916 m' },
+                    { value: 4, color: '#404040', label: '916 – 1,314 m' },
+                    { value: 5, color: '#000000', label: '1,314 – 2,747 m' }
+                ]
             }
         };
 
@@ -821,6 +831,35 @@
                             // Return null for values not in our discrete set
                             return null;
                         };
+                    } else if (layerId === 'elevation' && config.elevationBreaks) {
+                        // For discrete elevation classes
+                        var breaks = config.elevationBreaks;
+                        var colors = config.elevationColors;
+                        pixelValuesToColorFn = function(values) {
+                            var value = values[0];
+                            if (value === null || value === undefined || isNaN(value)) {
+                                return null;
+                            }
+                            
+                            // Filter common NoData values
+                            if (value === 255 || value === -9999 || value === -32768 || 
+                                value === -3.4e38 || Math.abs(value) > 1e10) {
+                                return null;
+                            }
+                            
+                            // Treat below 1 as transparent (ocean/background)
+                            if (value < 1) {
+                                return null;
+                            }
+                            
+                            // Classify into elevation categories
+                            for (var i = 0; i < breaks.length; i++) {
+                                if (value <= breaks[i]) {
+                                    return colors[i];
+                                }
+                            }
+                            return colors[colors.length - 1];
+                        };
                     } else {
                         // For continuous layers (ENM, Hotspot, Elevation)
                         var scale = config.mode 
@@ -847,11 +886,6 @@
                                 if (Math.abs(value - noDataVal) < 0.0001) {
                                     return null;
                                 }
-                            }
-                            
-                            // For elevation, treat below 1 as transparent (ocean/background)
-                            if (layerId === 'elevation' && value < 1) {
-                                return null;
                             }
                             
                             // For hotspot, check if class is hidden
@@ -997,6 +1031,25 @@
                     if (hidden[intValue]) return null;
                     if (discreteColors.hasOwnProperty(intValue)) return discreteColors[intValue];
                     return null;
+                };
+            } else if (layerId === 'elevation' && config.elevationBreaks) {
+                var breaks = config.elevationBreaks;
+                var colors = config.elevationColors;
+                var hidden = hiddenClasses[layerId];
+                pixelValuesToColorFn = function(values) {
+                    var value = values[0];
+                    if (value === null || value === undefined || isNaN(value)) return null;
+                    if (value === 255 || value === -9999 || value === -32768 || 
+                        value === -3.4e38 || Math.abs(value) > 1e10) return null;
+                    if (value < 1) return null;
+                    for (var i = 0; i < breaks.length; i++) {
+                        if (value <= breaks[i]) {
+                            if (hidden[i + 1]) return null;
+                            return colors[i];
+                        }
+                    }
+                    if (hidden[colors.length]) return null;
+                    return colors[colors.length - 1];
                 };
             } else if (layerId === 'hotspot') {
                 var scale = config.mode 

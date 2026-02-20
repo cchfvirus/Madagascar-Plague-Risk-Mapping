@@ -1137,6 +1137,8 @@
         var layerControl = L.control({position: 'topleft'});
         layerControl.onAdd = function (map) {
             var div = L.DomUtil.create('div', 'layer-control');
+            L.DomEvent.disableClickPropagation(div);
+            L.DomEvent.disableScrollPropagation(div);
             
             // Basemap section
             div.innerHTML = '<h4>Basemaps</h4>';
@@ -1186,6 +1188,8 @@
         legend.onAdd = function (map) {
             var div = L.DomUtil.create('div', 'legend');
             div.id = 'legend-content';
+            L.DomEvent.disableClickPropagation(div);
+            L.DomEvent.disableScrollPropagation(div);
             return div;
         };
         legend.addTo(map);
@@ -1194,6 +1198,8 @@
         var info = L.control({position: 'topright'});
         info.onAdd = function (map) {
             var div = L.DomUtil.create('div', 'info');
+            L.DomEvent.disableClickPropagation(div);
+            L.DomEvent.disableScrollPropagation(div);
             div.innerHTML = 
                 '<h4>Plague Risk Mapping - Madagascar</h4>' +
                 '<p>Select a layer to view different risk assessments.</p> ' +

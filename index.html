@@ -1247,22 +1247,7 @@
         };
         legend.addTo(map);
 
-        // Create info box
-        var info = L.control({position: 'topright'});
-        info.onAdd = function (map) {
-            var div = L.DomUtil.create('div', 'info');
-            L.DomEvent.disableClickPropagation(div);
-            L.DomEvent.disableScrollPropagation(div);
-            div.innerHTML = 
-                '<h4>Plague Risk Mapping - Madagascar</h4>' +
-                '<p>Select a layer to view different risk assessments.</p> ' +
-                '<p><em>Click plague case markers for details</em></p>' +
-                '<p><em>Right-click map to copy coordinates</em></p>' +
-                '<p><em>Left-click map to view cell value</em></p>' +
-                '<p><em>Use drawing tools to measure distance/area</em></p>';
-            return div;
-        };
-        info.addTo(map);
+        // Info box removed
 
         // Add right-click handler to copy coordinates
         map.on('contextmenu', function(e) {

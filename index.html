@@ -737,8 +737,14 @@
                             weight: 2,
                             opacity: 1
                         },
-                        interactive: false,
-                        pane: 'boundariesPane'
+                        pane: 'boundariesPane',
+                        onEachFeature: function(feature, layer) {
+                            if (feature.properties && feature.properties['ADM1-EN']) {
+                                layer.bindPopup('<h3>' + feature.properties['ADM1-EN'] + '</h3>', {
+                                    maxWidth: 250
+                                });
+                            }
+                        }
                     });
                     
                     highRiskBoundariesLayer.addTo(map);

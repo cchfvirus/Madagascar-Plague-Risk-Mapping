@@ -384,7 +384,7 @@
                 file: 'elevation.tif',
                 name: 'Elevation (DEM)',
                 colors: ['#FFFFFF', '#000000'],
-                domain: [1, 2747],
+                domain: [1, 2500],
                 labels: ['Low Elevation', 'High Elevation'],
                 description: 'Digital Elevation Model - White (low) to Black (high)',
                 continuousLegend: true
@@ -794,9 +794,30 @@
                             ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
                             : chroma.scale(config.colors).domain(config.domain);
                         
+                        // Capture noDataValue from georaster for use in color function
+                        var noDataVal = georaster.noDataValue;
+                        
                         pixelValuesToColorFn = function(values) {
                             var value = values[0];
                             if (value === null || value === undefined || isNaN(value)) {
+                                return null;
+                            }
+                            
+                            // Filter common NoData values
+                            if (value === 255 || value === -9999 || value === -32768 || 
+                                value === -3.4e38 || Math.abs(value) > 1e10) {
+                                return null;
+                            }
+                            
+                            // Check georaster's specified noDataValue
+                            if (noDataVal !== null && noDataVal !== undefined && !isNaN(noDataVal)) {
+                                if (Math.abs(value - noDataVal) < 0.0001) {
+                                    return null;
+                                }
+                            }
+                            
+                            // For elevation, treat below 1 as transparent (ocean/background)
+                            if (layerId === 'elevation' && value < 1) {
                                 return null;
                             }
                             return scale(value).hex();
@@ -1099,4 +1120,3 @@
     </script>
 </body>
 </html>
-

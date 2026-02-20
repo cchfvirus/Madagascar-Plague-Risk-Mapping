@@ -293,6 +293,9 @@
         map.createPane('rasterPane');
         map.getPane('rasterPane').style.zIndex = 300;
         
+        map.createPane('analysisPane');
+        map.getPane('analysisPane').style.zIndex = 310;
+        
         map.createPane('boundariesPane');
         map.getPane('boundariesPane').style.zIndex = 350;
 
@@ -314,6 +317,7 @@
         var layers = {};
         var georasters = {};
         var currentLayer = null;
+        var activeLayers = {};
         var loadedCount = 0;
         var totalLayers = 4;
         var plagueCasesLayer = null;
@@ -640,7 +644,7 @@
                     plagueCasesLayer.addTo(map);
                     
                     // Update legend to show plague cases
-                    updateLegend(currentLayer);
+                    updateLegend();
                 })
                 .catch(error => {
                     console.log('Plague cases file not found - layer will not be available');
@@ -799,12 +803,14 @@
                         };
                     }
                     
+                    var layerPane = (layerId === 'elevation') ? 'rasterPane' : 'analysisPane';
+                    
                     var layer = new GeoRasterLayer({
                         georaster: georaster,
                         opacity: layerOpacity,
                         pixelValuesToColorFn: pixelValuesToColorFn,
                         resolution: 256,
-                        pane: 'rasterPane'
+                        pane: layerPane
                     });
                     
                     layers[layerId] = layer;
@@ -813,19 +819,27 @@
                     updateStatus(config.name + ' ready! (' + loadedCount + '/' + totalLayers + ')');
                     
                     if (layerId === 'enm') {
-                        // ENM is always the default layer
-                        if (currentLayer && layers[currentLayer]) {
-                            map.removeLayer(layers[currentLayer]);
-                        }
+                        // ENM is always the default analysis layer
+                        // Remove any temporarily shown analysis layer
+                        Object.keys(activeLayers).forEach(function(id) {
+                            if (id !== 'elevation') {
+                                map.removeLayer(layers[id]);
+                                delete activeLayers[id];
+                            }
+                        });
                         layer.addTo(map);
+                        activeLayers[layerId] = true;
                         currentLayer = 'enm';
-                        updateLegend('enm');
+                        updateLegend();
                         updateHighRiskBoundaryStyle();
+                    } else if (layerId === 'elevation') {
+                        // Don't auto-show elevation on load
                     } else if (!currentLayer) {
                         // Only show another layer if ENM hasn't loaded yet
                         layer.addTo(map);
+                        activeLayers[layerId] = true;
                         currentLayer = layerId;
-                        updateLegend(layerId);
+                        updateLegend();
                         updateHighRiskBoundaryStyle();
                     }
                     
@@ -847,69 +861,101 @@
                 });
         }
 
-        function switchLayer(layerId) {
-            if (currentLayer && layers[currentLayer]) {
-                map.removeLayer(layers[currentLayer]);
+        function toggleLayer(layerId, show) {
+            if (!layers[layerId]) return;
+            
+            if (show) {
+                layers[layerId].addTo(map);
+                activeLayers[layerId] = true;
+            } else {
+                map.removeLayer(layers[layerId]);
+                delete activeLayers[layerId];
             }
             
-            if (layers[layerId]) {
-                layers[layerId].addTo(map);
-                currentLayer = layerId;
-                updateLegend(layerId);
-                updateHighRiskBoundaryStyle();
+            // Update currentLayer to the topmost active analysis layer (for click queries)
+            var analysisLayers = ['enm', 'risk', 'hotspot'];
+            currentLayer = null;
+            for (var i = analysisLayers.length - 1; i >= 0; i--) {
+                if (activeLayers[analysisLayers[i]]) {
+                    currentLayer = analysisLayers[i];
+                    break;
+                }
             }
+            // Fall back to elevation if no analysis layer is active
+            if (!currentLayer && activeLayers['elevation']) {
+                currentLayer = 'elevation';
+            }
+            
+            updateLegend();
+            updateHighRiskBoundaryStyle();
         }
 
-        function updateLegend(layerId) {
-            var config = layerConfigs[layerId];
+        function updateLegend() {
             var legendDiv = document.getElementById('legend-content');
+            legendDiv.innerHTML = '';
             
-            legendDiv.innerHTML = '<h4>' + config.name + '</h4>';
+            // Show legend for each active layer
+            var activeKeys = Object.keys(activeLayers);
+            if (activeKeys.length === 0) {
+                legendDiv.innerHTML = '<h4>No layers active</h4>';
+            }
             
-            if (config.customLegend && config.legendItems) {
-                config.legendItems.forEach(function(item) {
-                    legendDiv.innerHTML +=
-                        '<div class="item"><i style="background:' + item.color + '"></i> ' +
-                        item.label + '</div>';
-                });
-            } else if (config.continuousLegend) {
-                var gradientStops = [];
-                for (var i = 0; i < config.colors.length; i++) {
-                    var percentage = (i / (config.colors.length - 1)) * 100;
-                    gradientStops.push(config.colors[i] + ' ' + percentage + '%');
+            activeKeys.forEach(function(layerId, idx) {
+                var config = layerConfigs[layerId];
+                if (!config) return;
+                
+                // Add separator between layer legends
+                if (idx > 0) {
+                    legendDiv.innerHTML += '<div style="margin:10px 0; border-top:1px solid #ddd;"></div>';
                 }
-                var gradientCSS = 'linear-gradient(to right, ' + gradientStops.join(', ') + ')';
                 
-                legendDiv.innerHTML += 
-                    '<div class="gradient-bar" style="background: ' + gradientCSS + ';"></div>' +
-                    '<div class="gradient-labels">' +
-                    '<span>' + config.labels[0] + '</span>' +
-                    '<span>' + config.labels[1] + '</span>' +
-                    '</div>';
-            } else {
-                var numGrades = 5;
-                var range = config.domain[1] - config.domain[0];
-                var step = range / numGrades;
+                legendDiv.innerHTML += '<h4>' + config.name + '</h4>';
                 
-                var scale = config.mode 
-                    ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
-                    : chroma.scale(config.colors).domain(config.domain);
-                
-                for (var i = 0; i < numGrades; i++) {
-                    var value = config.domain[0] + (step * i);
-                    var nextValue = value + step;
-                    var color = scale(value + step/2).hex();
+                if (config.customLegend && config.legendItems) {
+                    config.legendItems.forEach(function(item) {
+                        legendDiv.innerHTML +=
+                            '<div class="item"><i style="background:' + item.color + '"></i> ' +
+                            item.label + '</div>';
+                    });
+                } else if (config.continuousLegend) {
+                    var gradientStops = [];
+                    for (var i = 0; i < config.colors.length; i++) {
+                        var percentage = (i / (config.colors.length - 1)) * 100;
+                        gradientStops.push(config.colors[i] + ' ' + percentage + '%');
+                    }
+                    var gradientCSS = 'linear-gradient(to right, ' + gradientStops.join(', ') + ')';
                     
-                    legendDiv.innerHTML +=
-                        '<div class="item"><i style="background:' + color + '"></i> ' +
-                        value.toFixed(2) + ' – ' + nextValue.toFixed(2) + '</div>';
+                    legendDiv.innerHTML += 
+                        '<div class="gradient-bar" style="background: ' + gradientCSS + ';"></div>' +
+                        '<div class="gradient-labels">' +
+                        '<span>' + config.labels[0] + '</span>' +
+                        '<span>' + config.labels[1] + '</span>' +
+                        '</div>';
+                } else {
+                    var numGrades = 5;
+                    var range = config.domain[1] - config.domain[0];
+                    var step = range / numGrades;
+                    
+                    var scale = config.mode 
+                        ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
+                        : chroma.scale(config.colors).domain(config.domain);
+                    
+                    for (var i = 0; i < numGrades; i++) {
+                        var value = config.domain[0] + (step * i);
+                        var nextValue = value + step;
+                        var color = scale(value + step/2).hex();
+                        
+                        legendDiv.innerHTML +=
+                            '<div class="item"><i style="background:' + color + '"></i> ' +
+                            value.toFixed(2) + ' – ' + nextValue.toFixed(2) + '</div>';
+                    }
                 }
-            }
-            
-            if (config.description) {
-                legendDiv.innerHTML += '<p style="margin-top:10px; font-size:11px; color:#777;">' + 
-                                       config.description + '</p>';
-            }
+                
+                if (config.description) {
+                    legendDiv.innerHTML += '<p style="margin-top:10px; font-size:11px; color:#777;">' + 
+                                           config.description + '</p>';
+                }
+            });
             
             // Add plague cases legend section if plague cases are loaded
             if (plagueCasesLayer) {
@@ -936,11 +982,11 @@
             // Risk layers section
             div.innerHTML += '<h4 style="margin-top:15px; padding-top:10px; border-top: 1px solid #ddd;">Risk Layers</h4>';
             
-            Object.keys(layerConfigs).forEach(function(key, index) {
-                var checked = index === 0 ? 'checked' : '';
+            Object.keys(layerConfigs).forEach(function(key) {
+                var checked = (key === 'enm') ? 'checked' : '';
                 div.innerHTML += 
-                    '<label><input type="radio" name="layer" value="' + key + '" ' + checked + 
-                    ' onchange="switchLayer(\'' + key + '\')">' + 
+                    '<label><input type="checkbox" name="layer" value="' + key + '" ' + checked + 
+                    ' onchange="toggleLayer(\'' + key + '\', this.checked)">' + 
                     layerConfigs[key].name + '</label>';
             });
             

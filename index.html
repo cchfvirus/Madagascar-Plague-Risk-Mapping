@@ -347,6 +347,10 @@
         var hotspotPolygonLayer = null;
         var hotspotPolygonData = null;
         var hotspotDisplayMode = 'Gi_Cluster'; // 'Gi_Cluster' or 'WRisk'
+
+        // Default opacities
+        var DEFAULT_RASTER_OPACITY = 0.8;
+        var DEFAULT_HOTSPOT_OPACITY = 0.8;
         
         // Track hidden classes per layer (for toggleable legend items)
         var hiddenClasses = {
@@ -792,6 +796,9 @@
             }
             return -1;
         }
+
+        // Current hotspot opacity (used to apply default on load + keep consistent when toggling classes)
+        var hotspotOpacity = DEFAULT_HOTSPOT_OPACITY;
         
         function getHotspotPolygonStyle(feature) {
             var fillColor;
@@ -826,10 +833,10 @@
             
             return {
                 fillColor: fillColor,
-                fillOpacity: 0.75,
+                fillOpacity: hotspotOpacity,
                 color: '#333333',
                 weight: 0.5,
-                opacity: 0.6
+                opacity: hotspotOpacity
             };
         }
         
@@ -860,6 +867,9 @@
                             layer.bindPopup(popupContent, { maxWidth: 300 });
                         }
                     });
+
+                    // Ensure it renders at the default opacity immediately on load
+                    updateHotspotOpacity(hotspotOpacity);
                     
                     loadedCount++;
                     updateStatus('Hot Spot Analysis (Commune) ready! (' + loadedCount + '/' + totalLayers + ')');
@@ -914,13 +924,13 @@
         }
         
         function updateHotspotOpacity(opacity) {
+            hotspotOpacity = opacity; // remember current value
             if (hotspotPolygonLayer) {
                 hotspotPolygonLayer.setStyle(function(feature) {
                     var style = getHotspotPolygonStyle(feature);
-                    // Only scale opacity for visible features
                     if (style.fillOpacity > 0) {
-                        style.fillOpacity = opacity * 0.75;
-                        style.opacity = opacity * 0.8;
+                        style.fillOpacity = opacity;
+                        style.opacity = opacity;
                     }
                     return style;
                 });
@@ -976,7 +986,7 @@
                     
                     console.log('Loaded ' + layerId + ' - noDataValue:', georaster.noDataValue);
                     
-                    var layerOpacity = 0.8;
+                    var layerOpacity = DEFAULT_RASTER_OPACITY;
                     
                     var pixelValuesToColorFn;
                     
@@ -1156,7 +1166,7 @@
             
             map.removeLayer(layers[layerId]);
             
-            var layerOpacity = 0.8;
+            var layerOpacity = DEFAULT_RASTER_OPACITY;
             var opacitySlider = document.getElementById('opacity-' + layerId);
             if (opacitySlider) {
                 layerOpacity = opacitySlider.value / 100;
@@ -1341,139 +1351,4 @@
         // Create layer control
         var layerControl = L.control({position: 'topleft'});
         layerControl.onAdd = function (map) {
-            var div = L.DomUtil.create('div', 'layer-control');
-            L.DomEvent.disableClickPropagation(div);
-            L.DomEvent.disableScrollPropagation(div);
-            
-            // Basemap section
-            div.innerHTML = '<h4>Basemaps</h4>';
-            div.innerHTML += '<label><input type="radio" name="basemap" value="street" checked onchange="switchBasemap(\'street\')">Street Map</label>';
-            div.innerHTML += '<label><input type="radio" name="basemap" value="satellite" onchange="switchBasemap(\'satellite\')">Satellite Imagery</label>';
-            
-            // Risk layers section
-            div.innerHTML += '<h4 style="margin-top:15px; padding-top:10px; border-top: 1px solid #ddd;">Risk Layers</h4>';
-            
-            Object.keys(layerConfigs).forEach(function(key) {
-                var checked = (key === 'enm') ? 'checked' : '';
-                div.innerHTML += 
-                    '<label><input type="checkbox" name="layer" value="' + key + '" ' + checked + 
-                    ' onchange="toggleLayer(\'' + key + '\', this.checked)">' + 
-                    layerConfigs[key].name + '</label>';
-            });
-            
-            // Hotspot polygon layer
-            div.innerHTML += 
-                '<label><input type="checkbox" name="layer" value="hotspot" ' + 
-                'onchange="toggleLayer(\'hotspot\', this.checked)">Hot Spot Analysis (Commune)</label>';
-            
-            // Hotspot display mode toggle
-            div.innerHTML += '<div id="hotspot-mode-toggle" style="margin-left:24px; font-size:11px;">';
-            div.innerHTML += '<label><input type="radio" name="hotspot-mode" value="Gi_Cluster" checked onchange="switchHotspotMode(\'Gi_Cluster\')" style="margin-right:4px;">Gi* Cluster</label>';
-            div.innerHTML += '<label><input type="radio" name="hotspot-mode" value="WRisk" onchange="switchHotspotMode(\'WRisk\')" style="margin-right:4px;">Weighted Risk</label>';
-            div.innerHTML += '</div>';
-            
-            // Overlay section
-            div.innerHTML += '<div class="overlay-section">';
-            div.innerHTML += '<h5>Overlays</h5>';
-            div.innerHTML += '<label><input type="checkbox" id="plague-cases-toggle" checked onchange="togglePlagueCases(this.checked)">Plague Cases (1939–2024)</label>';
-            div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">Admin2</label>';
-            div.innerHTML += '</div>';
-            
-            // Opacity sliders section
-            div.innerHTML += '<div class="opacity-section">';
-            div.innerHTML += '<h5>Layer Opacity</h5>';
-            
-            Object.keys(layerConfigs).forEach(function(key) {
-                var defaultOpacity = 0.8;
-                div.innerHTML += 
-                    '<div class="opacity-control">' +
-                    '<label>' + layerConfigs[key].name + ' <span class="opacity-value" id="opacity-value-' + key + '">' + Math.round(defaultOpacity * 100) + '%</span></label>' +
-                    '<input type="range" id="opacity-' + key + '" min="0" max="100" value="' + (defaultOpacity * 100) + '" ' +
-                    'oninput="updateLayerOpacity(\'' + key + '\', this.value/100); document.getElementById(\'opacity-value-' + key + '\').textContent = this.value + \'%\'">' +
-                    '</div>';
-            });
-            
-            // Hotspot polygon opacity slider
-            div.innerHTML += 
-                '<div class="opacity-control">' +
-                '<label>Hot Spot Analysis (Commune) <span class="opacity-value" id="opacity-value-hotspot">60%</span></label>' +
-                '<input type="range" id="opacity-hotspot" min="0" max="100" value="60" ' +
-                'oninput="updateHotspotOpacity(this.value/100); document.getElementById(\'opacity-value-hotspot\').textContent = this.value + \'%\'">' +
-                '</div>';
-            
-            div.innerHTML += '</div>';
-            
-            return div;
-        };
-        layerControl.addTo(map);
-
-        // Create legend
-        var legend = L.control({position: 'bottomright'});
-        legend.onAdd = function (map) {
-            var div = L.DomUtil.create('div', 'legend');
-            div.id = 'legend-content';
-            L.DomEvent.disableClickPropagation(div);
-            L.DomEvent.disableScrollPropagation(div);
-            return div;
-        };
-        legend.addTo(map);
-
-        // Add right-click handler to copy coordinates
-        map.on('contextmenu', function(e) {
-            copyCoordinatesToClipboard(e.latlng.lat, e.latlng.lng);
-        });
-
-        // Add left-click handler to show cell value from CURRENT layer only
-        map.on('click', function(e) {
-            if (!currentLayer || !georasters[currentLayer]) {
-                return;
-            }
-            
-            var value = getRasterValueAtPoint(currentLayer, e.latlng);
-            var config = layerConfigs[currentLayer];
-            
-            var displayValue;
-            if (value !== null) {
-                if (config.discreteDisplay) {
-                    displayValue = Math.round(value).toString();
-                } else {
-                    displayValue = value.toFixed(4);
-                }
-            } else {
-                displayValue = 'No Data';
-            }
-            
-            var unitSuffix = '';
-            if (currentLayer === 'elevation' && value !== null) {
-                unitSuffix = ' m';
-            }
-            
-            var popupContent = '<h3>' + config.name + '</h3><table>';
-            popupContent += '<tr><td>Coordinates</td><td>' + e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6) + '</td></tr>';
-            popupContent += '<tr><td>Cell Value</td><td>' + displayValue + unitSuffix + '</td></tr>';
-            popupContent += '</table>';
-            
-            L.popup()
-                .setLatLng(e.latlng)
-                .setContent(popupContent)
-                .openOn(map);
-        });
-
-        // Load all layers
-        updateStatus('Starting to load layers...');
-        Object.keys(layerConfigs).forEach(function(key) {
-            loadLayer(key);
-        });
-        
-        loadPlagueCases();
-        loadHighRiskBoundaries();
-        loadHotspotPolygons();
-    </script>
-</body>
-</html>
-
-
-
-
-
-
+            var div = L.Dom

@@ -976,7 +976,7 @@
                     
                     console.log('Loaded ' + layerId + ' - noDataValue:', georaster.noDataValue);
                     
-                    var layerOpacity = 0.6;
+                    var layerOpacity = 0.8;
                     
                     var pixelValuesToColorFn;
                     
@@ -1156,7 +1156,7 @@
             
             map.removeLayer(layers[layerId]);
             
-            var layerOpacity = 0.6;
+            var layerOpacity = 0.8;
             var opacitySlider = document.getElementById('opacity-' + layerId);
             if (opacitySlider) {
                 layerOpacity = opacitySlider.value / 100;
@@ -1471,6 +1471,7 @@
     </script>
 </body>
 </html>
+
 
 
 

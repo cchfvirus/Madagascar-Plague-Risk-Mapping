@@ -716,15 +716,15 @@
         }
 
         function loadHighRiskBoundaries() {
-            fetch('high_risk_boundaries.geojson')
+            fetch('admin2.geojson')
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error('High risk boundaries file not found');
+                        throw new Error('Admin2 boundaries file not found');
                     }
                     return response.json();
                 })
                 .then(data => {
-                    updateStatus('Loaded high risk boundaries');
+                    updateStatus('Loaded admin2 boundaries');
                     
                     // Initial color based on current layer (black for ENM, hotspot, elevation; white for risk)
                     var initialColor = (currentLayer === 'risk') ? '#FFFFFF' : '#000000';
@@ -750,7 +750,7 @@
                     highRiskBoundariesLayer.addTo(map);
                 })
                 .catch(error => {
-                    console.log('High risk boundaries file not found - layer will not be available');
+                    console.log('Admin2 boundaries file not found - layer will not be available');
                     // Fail silently - no status message shown to user
                 });
         }
@@ -1313,24 +1313,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

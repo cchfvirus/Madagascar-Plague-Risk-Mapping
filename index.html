@@ -306,7 +306,7 @@
 
     <script>
         // Initialize map - centered on Antananarivo region (central Madagascar) with zoom 10
-        var map = L.map('map').setView([-18.9, 47.52], 8);
+        var map = L.map('map').setView([-18.9, 47.52], 9);
 
         // Create custom panes with specific z-index ordering
         map.createPane('backgroundPane');
@@ -1384,7 +1384,7 @@
             div.innerHTML += '<h5>Layer Opacity</h5>';
             
             Object.keys(layerConfigs).forEach(function(key) {
-                var defaultOpacity = 0.6;
+                var defaultOpacity = 0.8;
                 div.innerHTML += 
                     '<div class="opacity-control">' +
                     '<label>' + layerConfigs[key].name + ' <span class="opacity-value" id="opacity-value-' + key + '">' + Math.round(defaultOpacity * 100) + '%</span></label>' +
@@ -1471,6 +1471,7 @@
     </script>
 </body>
 </html>
+
 
 
 

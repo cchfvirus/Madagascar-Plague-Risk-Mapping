@@ -721,18 +721,7 @@
                             opacity: 1
                         },
                         pane: 'boundariesPane',
-                        onEachFeature: function(feature, layer) {
-                            if (feature.properties) {
-                                var name1 = feature.properties['NAME_1'] || '';
-                                var name2 = feature.properties['NAME_2'] || '';
-                                var label = name2 ? name2 + ', ' + name1 : name1;
-                                if (label) {
-                                    layer.bindPopup('<h3>' + label + '</h3>', {
-                                        maxWidth: 250
-                                    });
-                                }
-                            }
-                        }
+                        interactive: false
                     });
                     
                     highRiskBoundariesLayer.addTo(map);

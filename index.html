@@ -341,14 +341,16 @@
         var currentLayer = null;
         var activeLayers = {};
         var loadedCount = 0;
-        var totalLayers = 4;
+        var totalLayers = 3;
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
+        var hotspotPolygonLayer = null;
+        var hotspotPolygonData = null;
+        var hotspotDisplayMode = 'Gi_Cluster'; // 'Gi_Cluster' or 'WRisk'
         
         // Track hidden classes per layer (for toggleable legend items)
         var hiddenClasses = {
             'risk': {},
-            'hotspot': {},
             'elevation': {}
         };
 
@@ -366,7 +368,7 @@
             },
             'risk': {
                 file: 'risk_zones_cog.tif',
-                name: 'Plague Exposure Risk Index',
+                name: 'Plague Exposure RI (100m - Population)',
                 discreteColors: {
                     0: '#000000',  // Black - No risk/background
                     1: '#FFFFBE',  // Light yellow - Very low risk
@@ -388,25 +390,6 @@
                     { value: 4, color: '#FF6600', label: '4 - Elevated Risk' },
                     { value: 6, color: '#FF0000', label: '6 - High Risk' },
                     { value: 9, color: '#A80000', label: '9 - Very High Risk' }
-                ]
-            },
-            'hotspot': {
-                file: 'hotspot_cog.tif',
-                name: 'Hot Spot Analysis (100m)',
-                colors: ['#0571b0', '#92c5de', '#f7f7f7', '#f4a582', '#ca0020'],
-                domain: [-3, 3],
-                labels: ['Cold Spot', 'Not Significant', 'Hot Spot'],
-                description: 'Getis-Ord Gi* statistic showing spatial clustering of plague risk',
-                customLegend: true,
-                discreteDisplay: true,
-                legendItems: [
-                    { value: 2.58, color: '#ca0020', label: 'Hot Spot with 99% Confidence' },
-                    { value: 1.96, color: '#f4a582', label: 'Hot Spot with 95% Confidence' },
-                    { value: 1.65, color: '#fddbc7', label: 'Hot Spot with 90% Confidence' },
-                    { value: 0, color: '#f7f7f7', label: 'Not Significant' },
-                    { value: -1.65, color: '#d1e5f0', label: 'Cold Spot with 90% Confidence' },
-                    { value: -1.96, color: '#92c5de', label: 'Cold Spot with 95% Confidence' },
-                    { value: -2.58, color: '#0571b0', label: 'Cold Spot with 99% Confidence' }
                 ]
             },
             'elevation': {
@@ -770,6 +753,162 @@
             }
         }
 
+        // Hotspot polygon color configurations
+        var hotspotGiClusterColors = {
+            3:  '#ca0020',   // Hot Spot with 99% Confidence
+            2:  '#f4a582',   // Hot Spot with 95% Confidence
+            1:  '#fddbc7',   // Hot Spot with 90% Confidence
+            0:  '#f7f7f7',   // Not Significant
+            '-1': '#d1e5f0', // Cold Spot with 90% Confidence
+            '-2': '#92c5de', // Cold Spot with 95% Confidence
+            '-3': '#0571b0'  // Cold Spot with 99% Confidence
+        };
+        
+        var hotspotGiClusterLegendItems = [
+            { value: 3, color: '#ca0020', label: 'Hot Spot with 99% Confidence' },
+            { value: 2, color: '#f4a582', label: 'Hot Spot with 95% Confidence' },
+            { value: 1, color: '#fddbc7', label: 'Hot Spot with 90% Confidence' },
+            { value: 0, color: '#f7f7f7', label: 'Not Significant' },
+            { value: -1, color: '#d1e5f0', label: 'Cold Spot with 90% Confidence' },
+            { value: -2, color: '#92c5de', label: 'Cold Spot with 95% Confidence' },
+            { value: -3, color: '#0571b0', label: 'Cold Spot with 99% Confidence' }
+        ];
+        
+        // WRisk uses same color ramp but with continuous breaks
+        var hotspotWRiskBreaks = [0, 1, 2, 3, 4, 5, 6, 7, 9];
+        var hotspotWRiskColors = ['#0571b0', '#92c5de', '#d1e5f0', '#f7f7f7', '#fddbc7', '#f4a582', '#ef8a62', '#ca0020', '#a50026'];
+        
+        var hotspotWRiskLegendItems = [
+            { color: '#0571b0', label: '0 – 1 (Very Low)' },
+            { color: '#92c5de', label: '1 – 2 (Low)' },
+            { color: '#d1e5f0', label: '2 – 3 (Low-Moderate)' },
+            { color: '#f7f7f7', label: '3 – 4 (Moderate)' },
+            { color: '#fddbc7', label: '4 – 5 (Moderate-High)' },
+            { color: '#f4a582', label: '5 – 6 (High)' },
+            { color: '#ef8a62', label: '6 – 7 (Very High)' },
+            { color: '#ca0020', label: '7 – 8 (Extreme)' },
+            { color: '#a50026', label: '8 – 9 (Extreme+)' }
+        ];
+        
+        function getWRiskColor(value) {
+            if (value === null || value === undefined) return '#cccccc';
+            for (var i = 0; i < hotspotWRiskBreaks.length - 1; i++) {
+                if (value >= hotspotWRiskBreaks[i] && value < hotspotWRiskBreaks[i + 1]) {
+                    return hotspotWRiskColors[i];
+                }
+            }
+            // Last class
+            if (value >= hotspotWRiskBreaks[hotspotWRiskBreaks.length - 1]) {
+                return hotspotWRiskColors[hotspotWRiskColors.length - 1];
+            }
+            return '#cccccc';
+        }
+        
+        function getHotspotPolygonStyle(feature) {
+            var fillColor;
+            if (hotspotDisplayMode === 'Gi_Cluster') {
+                var gi = feature.properties['Gi_Cluster'];
+                fillColor = hotspotGiClusterColors[gi] || '#cccccc';
+            } else {
+                fillColor = getWRiskColor(feature.properties['WRisk']);
+            }
+            return {
+                fillColor: fillColor,
+                fillOpacity: 0.75,
+                color: '#333333',
+                weight: 0.5,
+                opacity: 0.6
+            };
+        }
+        
+        function loadHotspotPolygons() {
+            fetch('hotspot_admin4.json')
+                .then(response => {
+                    if (!response.ok) throw new Error('Hotspot admin4 file not found');
+                    return response.json();
+                })
+                .then(data => {
+                    hotspotPolygonData = data;
+                    updateStatus('Loaded ' + data.features.length + ' hotspot communes');
+                    
+                    hotspotPolygonLayer = L.geoJSON(data, {
+                        style: getHotspotPolygonStyle,
+                        pane: 'analysisPane',
+                        onEachFeature: function(feature, layer) {
+                            var p = feature.properties;
+                            var popupContent = '<h3>' + (p.NAME_4 || '') + '</h3><table>';
+                            popupContent += '<tr><td>Region</td><td>' + (p.NAME_1 || '') + '</td></tr>';
+                            popupContent += '<tr><td>District</td><td>' + (p.NAME_2 || '') + '</td></tr>';
+                            popupContent += '<tr><td>Sub-district</td><td>' + (p.NAME_3 || '') + '</td></tr>';
+                            popupContent += '<tr><td>Commune</td><td>' + (p.NAME_4 || '') + '</td></tr>';
+                            popupContent += '<tr><td>Gi* Cluster</td><td>' + p.Gi_Cluster + '</td></tr>';
+                            popupContent += '<tr><td>Z-Score</td><td>' + (p.ZScore ? p.ZScore.toFixed(4) : '') + '</td></tr>';
+                            popupContent += '<tr><td>Weighted Risk</td><td>' + (p.WRisk ? p.WRisk.toFixed(4) : '0') + '</td></tr>';
+                            popupContent += '</table>';
+                            layer.bindPopup(popupContent, { maxWidth: 300 });
+                        }
+                    });
+                    
+                    // Don't add to map by default - user must toggle it on
+                    loadedCount++;
+                    updateStatus('Hot Spot Analysis (Commune) ready! (' + loadedCount + '/' + totalLayers + ')');
+                    
+                    if (loadedCount === totalLayers) {
+                        setTimeout(function() {
+                            document.getElementById('loading').style.display = 'none';
+                        }, 1000);
+                    }
+                })
+                .catch(error => {
+                    console.log('Hotspot admin4 file not found - layer will not be available');
+                    loadedCount++;
+                    if (loadedCount === totalLayers) {
+                        setTimeout(function() {
+                            document.getElementById('loading').style.display = 'none';
+                        }, 1000);
+                    }
+                });
+        }
+        
+        function toggleHotspotPolygons(show) {
+            if (!hotspotPolygonLayer) return;
+            if (show) {
+                hotspotPolygonLayer.addTo(map);
+                activeLayers['hotspot'] = true;
+            } else {
+                map.removeLayer(hotspotPolygonLayer);
+                delete activeLayers['hotspot'];
+            }
+            
+            // Update currentLayer
+            var analysisLayers = ['enm', 'risk', 'hotspot'];
+            currentLayer = null;
+            for (var i = analysisLayers.length - 1; i >= 0; i--) {
+                if (activeLayers[analysisLayers[i]]) {
+                    currentLayer = analysisLayers[i];
+                    break;
+                }
+            }
+            if (!currentLayer && activeLayers['elevation']) currentLayer = 'elevation';
+            
+            updateLegend();
+            updateHighRiskBoundaryStyle();
+        }
+        
+        function switchHotspotMode(mode) {
+            hotspotDisplayMode = mode;
+            if (hotspotPolygonLayer) {
+                hotspotPolygonLayer.setStyle(getHotspotPolygonStyle);
+            }
+            updateLegend();
+        }
+        
+        function updateHotspotOpacity(opacity) {
+            if (hotspotPolygonLayer) {
+                hotspotPolygonLayer.setStyle({ fillOpacity: opacity * 0.75, opacity: opacity * 0.6 });
+            }
+        }
+
         function switchBasemap(basemapType) {
             map.removeLayer(streetMap);
             map.removeLayer(satelliteMap);
@@ -899,14 +1038,6 @@
                                 }
                             }
                             
-                            // For hotspot, check if class is hidden
-                            if (layerId === 'hotspot' && hiddenClasses['hotspot']) {
-                                var classValue = getHotspotClass(value);
-                                if (hiddenClasses['hotspot'][classValue]) {
-                                    return null;
-                                }
-                            }
-                            
                             return scale(value).hex();
                         };
                     }
@@ -970,6 +1101,12 @@
         }
 
         function toggleLayer(layerId, show) {
+            // Hotspot is now a polygon layer, handle separately
+            if (layerId === 'hotspot') {
+                toggleHotspotPolygons(show);
+                return;
+            }
+            
             if (!layers[layerId]) return;
             
             if (show) {
@@ -1062,28 +1199,6 @@
                     if (hidden[colors.length]) return null;
                     return colors[colors.length - 1];
                 };
-            } else if (layerId === 'hotspot') {
-                var scale = config.mode 
-                    ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
-                    : chroma.scale(config.colors).domain(config.domain);
-                var noDataVal = georaster.noDataValue;
-                var hidden = hiddenClasses[layerId];
-                
-                pixelValuesToColorFn = function(values) {
-                    var value = values[0];
-                    if (value === null || value === undefined || isNaN(value)) return null;
-                    if (value === 255 || value === -9999 || value === -32768 || 
-                        value === -3.4e38 || Math.abs(value) > 1e10) return null;
-                    if (noDataVal !== null && noDataVal !== undefined && !isNaN(noDataVal)) {
-                        if (Math.abs(value - noDataVal) < 0.0001) return null;
-                    }
-                    
-                    // Check which hotspot class this value falls into and if it's hidden
-                    var classValue = getHotspotClass(value);
-                    if (hidden[classValue]) return null;
-                    
-                    return scale(value).hex();
-                };
             }
             
             if (!pixelValuesToColorFn) return;
@@ -1101,17 +1216,6 @@
             layers[layerId] = newLayer;
             newLayer.addTo(map);
         }
-        
-        // Determine which hotspot class a value belongs to
-        function getHotspotClass(value) {
-            if (value >= 2.58) return 2.58;
-            if (value >= 1.96) return 1.96;
-            if (value >= 1.65) return 1.65;
-            if (value > -1.65) return 0;
-            if (value > -1.96) return -1.65;
-            if (value > -2.58) return -1.96;
-            return -2.58;
-        }
 
         function updateLegend() {
             var legendDiv = document.getElementById('legend-content');
@@ -1124,6 +1228,29 @@
             }
             
             activeKeys.forEach(function(layerId, idx) {
+                // Handle hotspot polygon layer separately
+                if (layerId === 'hotspot') {
+                    if (idx > 0) {
+                        legendDiv.innerHTML += '<div style="margin:10px 0; border-top:1px solid #ddd;"></div>';
+                    }
+                    
+                    var modeName = hotspotDisplayMode === 'Gi_Cluster' ? 'Gi* Cluster' : 'Weighted Risk';
+                    legendDiv.innerHTML += '<h4>Hot Spot Analysis – Commune (' + modeName + ')</h4>';
+                    
+                    var legendItems = hotspotDisplayMode === 'Gi_Cluster' 
+                        ? hotspotGiClusterLegendItems 
+                        : hotspotWRiskLegendItems;
+                    
+                    legendItems.forEach(function(item) {
+                        legendDiv.innerHTML +=
+                            '<div class="item"><i style="background:' + item.color + '"></i> ' +
+                            item.label + '</div>';
+                    });
+                    
+                    legendDiv.innerHTML += '<p style="margin-top:10px; font-size:11px; color:#777;">Getis-Ord Gi* hot spot analysis at commune level</p>';
+                    return;
+                }
+                
                 var config = layerConfigs[layerId];
                 if (!config) return;
                 
@@ -1220,6 +1347,17 @@
                     layerConfigs[key].name + '</label>';
             });
             
+            // Hotspot polygon layer (separate from raster configs)
+            div.innerHTML += 
+                '<label><input type="checkbox" name="layer" value="hotspot" ' + 
+                'onchange="toggleLayer(\'hotspot\', this.checked)">Hot Spot Analysis (Commune)</label>';
+            
+            // Hotspot display mode toggle
+            div.innerHTML += '<div id="hotspot-mode-toggle" style="margin-left:24px; font-size:11px;">';
+            div.innerHTML += '<label><input type="radio" name="hotspot-mode" value="Gi_Cluster" checked onchange="switchHotspotMode(\'Gi_Cluster\')" style="margin-right:4px;">Gi* Cluster</label>';
+            div.innerHTML += '<label><input type="radio" name="hotspot-mode" value="WRisk" onchange="switchHotspotMode(\'WRisk\')" style="margin-right:4px;">Weighted Risk</label>';
+            div.innerHTML += '</div>';
+            
             // Overlay section
             div.innerHTML += '<div class="overlay-section">';
             div.innerHTML += '<h5>Overlays</h5>';
@@ -1240,6 +1378,14 @@
                     'oninput="updateLayerOpacity(\'' + key + '\', this.value/100); document.getElementById(\'opacity-value-' + key + '\').textContent = this.value + \'%\'">' +
                     '</div>';
             });
+            
+            // Hotspot polygon opacity slider
+            div.innerHTML += 
+                '<div class="opacity-control">' +
+                '<label>Hot Spot Analysis (Commune) <span class="opacity-value" id="opacity-value-hotspot">60%</span></label>' +
+                '<input type="range" id="opacity-hotspot" min="0" max="100" value="60" ' +
+                'oninput="updateHotspotOpacity(this.value/100); document.getElementById(\'opacity-value-hotspot\').textContent = this.value + \'%\'">' +
+                '</div>';
             
             div.innerHTML += '</div>';
             
@@ -1315,7 +1461,7 @@
         
         loadPlagueCases();
         loadHighRiskBoundaries();
+        loadHotspotPolygons();
     </script>
 </body>
 </html>
-

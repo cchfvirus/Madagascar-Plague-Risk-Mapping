@@ -370,7 +370,7 @@
             },
             'risk': {
                 file: 'risk_zones_cog.tif',
-                name: 'Plague Exposure RI (100m - Population)',
+                name: 'Plague Exposure Risk Index',
                 discreteColors: {
                     0: '#000000',  // Black - No risk/background
                     1: '#FFFFBE',  // Light yellow - Very low risk
@@ -1229,7 +1229,10 @@
                         legendDiv.innerHTML += '<div style="margin:10px 0; border-top:1px solid #ddd;"></div>';
                     }
                     
-                    var modeName = hotspotDisplayMode === 'Gi_Cluster' ? 'Gi* Cluster' : 'Weighted Risk';
+                    var modeName = hotspotDisplayMode === 'Gi_Cluster'
+                        ? 'Plague Risk'
+                        : 'Population Weighted Risk';
+
                     legendDiv.innerHTML += '<h4>Hot Spot Analysis – Commune (' + modeName + ')</h4>';
                     
                     if (hotspotDisplayMode === 'Gi_Cluster') {
@@ -1245,8 +1248,9 @@
                                 item.label + '</div>';
                         });
                     } else {
-                        // Interactive Weighted Risk legend with float values
-                        hotspotWRiskLegendItems.forEach(function(item) {
+                        // Interactive Weighted Risk legend (highest risk at top)
+                        for (var i = hotspotWRiskLegendItems.length - 1; i >= 0; i--) {
+                            var item = hotspotWRiskLegendItems[i];
                             var isHidden = hiddenClasses['hotspot_wrisk'][item.index];
                             var checkedAttr = isHidden ? '' : 'checked';
                             var hiddenClass = isHidden ? ' hidden-class' : '';
@@ -1255,7 +1259,7 @@
                                 '<input type="checkbox" ' + checkedAttr + ' onchange="toggleHotspotClass(\'wrisk\', ' + item.index + ', this.checked)">' +
                                 '<i style="background:' + item.color + '"></i> ' +
                                 item.label + '</div>';
-                        });
+                        }
                     }
                     
                     legendDiv.innerHTML += '<p style="margin-top:10px; font-size:11px; color:#777;">Getis-Ord Gi* hot spot analysis at commune level</p>';

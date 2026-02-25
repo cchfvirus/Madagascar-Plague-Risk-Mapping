@@ -351,7 +351,9 @@
         // Track hidden classes per layer (for toggleable legend items)
         var hiddenClasses = {
             'risk': {},
-            'elevation': {}
+            'elevation': {},
+            'hotspot_gi': {},
+            'hotspot_wrisk': {}
         };
 
         // Layer configurations
@@ -474,10 +476,9 @@
                 layer.bindPopup('<b>Area:</b> ' + areaKm + ' km²');
                 drawnItems.addLayer(layer);
             } else if (type === 'rectangle') {
-                // Rectangle for measurement
                 var bounds = layer.getBounds();
                 var area = (bounds.getNorth() - bounds.getSouth()) * 
-                           (bounds.getEast() - bounds.getWest()) * 111 * 111; // Rough km²
+                           (bounds.getEast() - bounds.getWest()) * 111 * 111;
                 layer.bindPopup('<b>Rectangle Area:</b> ~' + area.toFixed(2) + ' km²');
                 drawnItems.addLayer(layer);
             }
@@ -560,7 +561,6 @@
                 var x = latlng.lng;
                 var y = latlng.lat;
                 
-                // Get georaster bounds
                 var xmin = georaster.xmin;
                 var xmax = georaster.xmax;
                 var ymin = georaster.ymin;
@@ -568,40 +568,33 @@
                 var width = georaster.width;
                 var height = georaster.height;
                 
-                // Check if point is within bounds
                 if (x < xmin || x > xmax || y < ymin || y > ymax) {
                     return null;
                 }
                 
-                // Calculate pixel coordinates
                 var pixelWidth = (xmax - xmin) / width;
                 var pixelHeight = (ymax - ymin) / height;
                 
                 var pixelX = Math.floor((x - xmin) / pixelWidth);
                 var pixelY = Math.floor((ymax - y) / pixelHeight);
                 
-                // Make sure we're within the raster bounds
                 if (pixelX < 0 || pixelX >= width || pixelY < 0 || pixelY >= height) {
                     return null;
                 }
                 
-                // Get the value from the raster - values[0] is a 2D array [row][col]
                 var values = georaster.values;
                 if (values && values[0] && values[0][pixelY]) {
                     var value = values[0][pixelY][pixelX];
                     
                     console.log('Layer:', layerId, 'Raw value:', value, 'Type:', typeof value, 'NoDataValue:', georaster.noDataValue);
                     
-                    // Check for nodata value - including common noData values
                     if (value !== null && value !== undefined && !isNaN(value)) {
-                        // Filter out common NoData values
                         if (value === 255 || value === -9999 || value === -3.4e38 || 
                             Math.abs(value) > 1e10 || value === -32768) {
                             console.log('Filtered as NoData:', value);
                             return null;
                         }
                         
-                        // Check georaster's specified noDataValue
                         if (georaster.noDataValue !== null && georaster.noDataValue !== undefined && !isNaN(georaster.noDataValue)) {
                             if (Math.abs(value - georaster.noDataValue) < 0.0001) {
                                 console.log('Value matches noDataValue:', georaster.noDataValue);
@@ -619,7 +612,6 @@
             return null;
         }
 
-        // Toggle export mode
         // Load plague cases from GeoJSON
         function loadPlagueCases() {
             fetch('cases.geojson')
@@ -664,12 +656,10 @@
                     
                     plagueCasesLayer.addTo(map);
                     
-                    // Update legend to show plague cases
                     updateLegend();
                 })
                 .catch(error => {
                     console.log('Plague cases file not found - layer will not be available');
-                    // Fail silently - no status message shown to user
                 });
         }
 
@@ -685,7 +675,6 @@
 
         function updateHighRiskBoundaryStyle() {
             if (highRiskBoundariesLayer) {
-                // Black boundaries for ENM, Hotspot, and Elevation layers, white for Risk layer
                 var boundaryColor = (currentLayer === 'risk') ? '#FFFFFF' : '#000000';
                 
                 highRiskBoundariesLayer.setStyle({
@@ -709,7 +698,6 @@
                 .then(data => {
                     updateStatus('Loaded admin2 boundaries');
                     
-                    // Initial color based on current layer (black for ENM, hotspot, elevation; white for risk)
                     var initialColor = (currentLayer === 'risk') ? '#FFFFFF' : '#000000';
                     
                     highRiskBoundariesLayer = L.geoJSON(data, {
@@ -728,7 +716,6 @@
                 })
                 .catch(error => {
                     console.log('Admin2 boundaries file not found - layer will not be available');
-                    // Fail silently - no status message shown to user
                 });
         }
 
@@ -744,13 +731,13 @@
 
         // Hotspot polygon color configurations
         var hotspotGiClusterColors = {
-            3:  '#ca0020',   // Hot Spot with 99% Confidence
-            2:  '#f4a582',   // Hot Spot with 95% Confidence
-            1:  '#fddbc7',   // Hot Spot with 90% Confidence
-            0:  '#f7f7f7',   // Not Significant
-            '-1': '#d1e5f0', // Cold Spot with 90% Confidence
-            '-2': '#92c5de', // Cold Spot with 95% Confidence
-            '-3': '#0571b0'  // Cold Spot with 99% Confidence
+            3:  '#ca0020',
+            2:  '#f4a582',
+            1:  '#fddbc7',
+            0:  '#f7f7f7',
+            '-1': '#d1e5f0',
+            '-2': '#92c5de',
+            '-3': '#0571b0'
         };
         
         var hotspotGiClusterLegendItems = [
@@ -763,20 +750,20 @@
             { value: -3, color: '#0571b0', label: 'Cold Spot with 99% Confidence' }
         ];
         
-        // WRisk uses same color ramp but with continuous breaks
-        var hotspotWRiskBreaks = [0, 1, 2, 3, 4, 5, 6, 7, 9];
+        // WRisk uses continuous float breaks
+        var hotspotWRiskBreaks = [0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0];
         var hotspotWRiskColors = ['#0571b0', '#92c5de', '#d1e5f0', '#f7f7f7', '#fddbc7', '#f4a582', '#ef8a62', '#ca0020', '#a50026'];
         
         var hotspotWRiskLegendItems = [
-            { color: '#0571b0', label: '0 – 1 (Very Low)' },
-            { color: '#92c5de', label: '1 – 2 (Low)' },
-            { color: '#d1e5f0', label: '2 – 3 (Low-Moderate)' },
-            { color: '#f7f7f7', label: '3 – 4 (Moderate)' },
-            { color: '#fddbc7', label: '4 – 5 (Moderate-High)' },
-            { color: '#f4a582', label: '5 – 6 (High)' },
-            { color: '#ef8a62', label: '6 – 7 (Very High)' },
-            { color: '#ca0020', label: '7 – 8 (Extreme)' },
-            { color: '#a50026', label: '8 – 9 (Extreme+)' }
+            { index: 0, color: '#0571b0', label: '0.0 – 1.0 (Very Low)' },
+            { index: 1, color: '#92c5de', label: '1.0 – 2.0 (Low)' },
+            { index: 2, color: '#d1e5f0', label: '2.0 – 3.0 (Low-Moderate)' },
+            { index: 3, color: '#f7f7f7', label: '3.0 – 4.0 (Moderate)' },
+            { index: 4, color: '#fddbc7', label: '4.0 – 5.0 (Moderate-High)' },
+            { index: 5, color: '#f4a582', label: '5.0 – 6.0 (High)' },
+            { index: 6, color: '#ef8a62', label: '6.0 – 7.0 (Very High)' },
+            { index: 7, color: '#ca0020', label: '7.0 – 8.0 (Extreme)' },
+            { index: 8, color: '#a50026', label: '8.0 – 9.0 (Extreme+)' }
         ];
         
         function getWRiskColor(value) {
@@ -786,21 +773,57 @@
                     return hotspotWRiskColors[i];
                 }
             }
-            // Last class
             if (value >= hotspotWRiskBreaks[hotspotWRiskBreaks.length - 1]) {
                 return hotspotWRiskColors[hotspotWRiskColors.length - 1];
             }
             return '#cccccc';
         }
         
+        // Get the WRisk class index for a given value (used for toggling)
+        function getWRiskClassIndex(value) {
+            if (value === null || value === undefined) return -1;
+            for (var i = 0; i < hotspotWRiskBreaks.length - 1; i++) {
+                if (value >= hotspotWRiskBreaks[i] && value < hotspotWRiskBreaks[i + 1]) {
+                    return i;
+                }
+            }
+            if (value >= hotspotWRiskBreaks[hotspotWRiskBreaks.length - 1]) {
+                return hotspotWRiskColors.length - 1;
+            }
+            return -1;
+        }
+        
         function getHotspotPolygonStyle(feature) {
             var fillColor;
+            var isHidden = false;
+            
             if (hotspotDisplayMode === 'Gi_Cluster') {
                 var gi = feature.properties['Gi_Cluster'];
+                // Check if this Gi class is hidden
+                if (hiddenClasses['hotspot_gi'][gi]) {
+                    isHidden = true;
+                }
                 fillColor = hotspotGiClusterColors[gi] || '#cccccc';
             } else {
-                fillColor = getWRiskColor(feature.properties['WRisk']);
+                var wriskVal = feature.properties['WRisk'];
+                var classIdx = getWRiskClassIndex(wriskVal);
+                // Check if this WRisk class is hidden
+                if (hiddenClasses['hotspot_wrisk'][classIdx]) {
+                    isHidden = true;
+                }
+                fillColor = getWRiskColor(wriskVal);
             }
+            
+            if (isHidden) {
+                return {
+                    fillColor: fillColor,
+                    fillOpacity: 0,
+                    color: '#333333',
+                    weight: 0,
+                    opacity: 0
+                };
+            }
+            
             return {
                 fillColor: fillColor,
                 fillOpacity: 0.75,
@@ -838,7 +861,6 @@
                         }
                     });
                     
-                    // Don't add to map by default - user must toggle it on
                     loadedCount++;
                     updateStatus('Hot Spot Analysis (Commune) ready! (' + loadedCount + '/' + totalLayers + ')');
                     
@@ -869,7 +891,6 @@
                 delete activeLayers['hotspot'];
             }
             
-            // Update currentLayer
             var analysisLayers = ['enm', 'risk', 'hotspot'];
             currentLayer = null;
             for (var i = analysisLayers.length - 1; i >= 0; i--) {
@@ -894,7 +915,29 @@
         
         function updateHotspotOpacity(opacity) {
             if (hotspotPolygonLayer) {
-                hotspotPolygonLayer.setStyle({ fillOpacity: opacity * 0.75, opacity: opacity * 0.6 });
+                hotspotPolygonLayer.setStyle(function(feature) {
+                    var style = getHotspotPolygonStyle(feature);
+                    // Only scale opacity for visible features
+                    if (style.fillOpacity > 0) {
+                        style.fillOpacity = opacity * 0.75;
+                        style.opacity = opacity * 0.6;
+                    }
+                    return style;
+                });
+            }
+        }
+        
+        // Toggle individual hotspot legend classes
+        function toggleHotspotClass(mode, classValue, show) {
+            var key = (mode === 'gi') ? 'hotspot_gi' : 'hotspot_wrisk';
+            if (show) {
+                delete hiddenClasses[key][classValue];
+            } else {
+                hiddenClasses[key][classValue] = true;
+            }
+            // Re-style the polygon layer
+            if (hotspotPolygonLayer) {
+                hotspotPolygonLayer.setStyle(getHotspotPolygonStyle);
             }
         }
 
@@ -929,49 +972,34 @@
                 .then(georaster => {
                     updateStatus(config.name + ' parsed successfully');
                     
-                    // Store the georaster for value querying
                     georasters[layerId] = georaster;
                     
                     console.log('Loaded ' + layerId + ' - noDataValue:', georaster.noDataValue);
                     
-                    // Set default opacity: All layers default to 0.6 (60%)
                     var layerOpacity = 0.6;
                     
-                    // Create pixel value to color function based on layer type
                     var pixelValuesToColorFn;
                     
                     if (layerId === 'risk' && config.discreteColors) {
-                        // For discrete risk layer - capture discreteColors in closure
                         var discreteColors = config.discreteColors;
                         pixelValuesToColorFn = function(values) {
                             var value = values[0];
                             if (value === null || value === undefined || isNaN(value)) {
                                 return null;
                             }
-                            
-                            // Filter out 255 (noData value)
                             if (value === 255) {
                                 return null;
                             }
-                            
-                            // Round to nearest integer
                             var intValue = Math.round(value);
-                            
-                            // Check if class is hidden
                             if (hiddenClasses['risk'] && hiddenClasses['risk'][intValue]) {
                                 return null;
                             }
-                            
-                            // Look up color in discrete mapping
                             if (discreteColors.hasOwnProperty(intValue)) {
                                 return discreteColors[intValue];
                             }
-                            
-                            // Return null for values not in our discrete set
                             return null;
                         };
                     } else if (layerId === 'elevation' && config.elevationBreaks) {
-                        // For discrete elevation classes
                         var breaks = config.elevationBreaks;
                         var colors = config.elevationColors;
                         pixelValuesToColorFn = function(values) {
@@ -979,19 +1007,13 @@
                             if (value === null || value === undefined || isNaN(value)) {
                                 return null;
                             }
-                            
-                            // Filter common NoData values
                             if (value === 255 || value === -9999 || value === -32768 || 
                                 value === -3.4e38 || Math.abs(value) > 1e10) {
                                 return null;
                             }
-                            
-                            // Treat below 1 as transparent (ocean/background)
                             if (value < 1) {
                                 return null;
                             }
-                            
-                            // Classify into elevation categories
                             for (var i = 0; i < breaks.length; i++) {
                                 if (value <= breaks[i]) {
                                     return colors[i];
@@ -1000,12 +1022,10 @@
                             return colors[colors.length - 1];
                         };
                     } else {
-                        // For continuous layers (ENM, Hotspot, Elevation)
                         var scale = config.mode 
                             ? chroma.scale(config.colors).mode(config.mode).domain(config.domain)
                             : chroma.scale(config.colors).domain(config.domain);
                         
-                        // Capture noDataValue from georaster for use in color function
                         var noDataVal = georaster.noDataValue;
                         
                         pixelValuesToColorFn = function(values) {
@@ -1013,20 +1033,15 @@
                             if (value === null || value === undefined || isNaN(value)) {
                                 return null;
                             }
-                            
-                            // Filter common NoData values
                             if (value === 255 || value === -9999 || value === -32768 || 
                                 value === -3.4e38 || Math.abs(value) > 1e10) {
                                 return null;
                             }
-                            
-                            // Check georaster's specified noDataValue
                             if (noDataVal !== null && noDataVal !== undefined && !isNaN(noDataVal)) {
                                 if (Math.abs(value - noDataVal) < 0.0001) {
                                     return null;
                                 }
                             }
-                            
                             return scale(value).hex();
                         };
                     }
@@ -1047,8 +1062,6 @@
                     updateStatus(config.name + ' ready! (' + loadedCount + '/' + totalLayers + ')');
                     
                     if (layerId === 'enm') {
-                        // ENM is always the default analysis layer
-                        // Remove any temporarily shown analysis layer
                         Object.keys(activeLayers).forEach(function(id) {
                             if (id !== 'elevation') {
                                 map.removeLayer(layers[id]);
@@ -1063,7 +1076,6 @@
                     } else if (layerId === 'elevation') {
                         // Don't auto-show elevation on load
                     } else if (!currentLayer) {
-                        // Only show another layer if ENM hasn't loaded yet
                         layer.addTo(map);
                         activeLayers[layerId] = true;
                         currentLayer = layerId;
@@ -1090,7 +1102,6 @@
         }
 
         function toggleLayer(layerId, show) {
-            // Hotspot is now a polygon layer, handle separately
             if (layerId === 'hotspot') {
                 toggleHotspotPolygons(show);
                 return;
@@ -1106,7 +1117,6 @@
                 delete activeLayers[layerId];
             }
             
-            // Update currentLayer to the topmost active analysis layer (for click queries)
             var analysisLayers = ['enm', 'risk', 'hotspot'];
             currentLayer = null;
             for (var i = analysisLayers.length - 1; i >= 0; i--) {
@@ -1115,7 +1125,6 @@
                     break;
                 }
             }
-            // Fall back to elevation if no analysis layer is active
             if (!currentLayer && activeLayers['elevation']) {
                 currentLayer = 'elevation';
             }
@@ -1145,11 +1154,9 @@
             var georaster = georasters[layerId];
             if (!georaster) return;
             
-            // Remove old layer
             map.removeLayer(layers[layerId]);
             
             var layerOpacity = 0.6;
-            // Try to get current opacity from slider
             var opacitySlider = document.getElementById('opacity-' + layerId);
             if (opacitySlider) {
                 layerOpacity = opacitySlider.value / 100;
@@ -1210,7 +1217,6 @@
             var legendDiv = document.getElementById('legend-content');
             legendDiv.innerHTML = '';
             
-            // Show legend for each active layer
             var activeKeys = Object.keys(activeLayers);
             if (activeKeys.length === 0) {
                 legendDiv.innerHTML = '<h4>No layers active</h4>';
@@ -1226,15 +1232,31 @@
                     var modeName = hotspotDisplayMode === 'Gi_Cluster' ? 'Gi* Cluster' : 'Weighted Risk';
                     legendDiv.innerHTML += '<h4>Hot Spot Analysis – Commune (' + modeName + ')</h4>';
                     
-                    var legendItems = hotspotDisplayMode === 'Gi_Cluster' 
-                        ? hotspotGiClusterLegendItems 
-                        : hotspotWRiskLegendItems;
-                    
-                    legendItems.forEach(function(item) {
-                        legendDiv.innerHTML +=
-                            '<div class="item"><i style="background:' + item.color + '"></i> ' +
-                            item.label + '</div>';
-                    });
+                    if (hotspotDisplayMode === 'Gi_Cluster') {
+                        // Interactive Gi* Cluster legend
+                        hotspotGiClusterLegendItems.forEach(function(item) {
+                            var isHidden = hiddenClasses['hotspot_gi'][item.value];
+                            var checkedAttr = isHidden ? '' : 'checked';
+                            var hiddenClass = isHidden ? ' hidden-class' : '';
+                            legendDiv.innerHTML +=
+                                '<div class="item toggleable' + hiddenClass + '">' +
+                                '<input type="checkbox" ' + checkedAttr + ' onchange="toggleHotspotClass(\'gi\', ' + item.value + ', this.checked)">' +
+                                '<i style="background:' + item.color + '"></i> ' +
+                                item.label + '</div>';
+                        });
+                    } else {
+                        // Interactive Weighted Risk legend with float values
+                        hotspotWRiskLegendItems.forEach(function(item) {
+                            var isHidden = hiddenClasses['hotspot_wrisk'][item.index];
+                            var checkedAttr = isHidden ? '' : 'checked';
+                            var hiddenClass = isHidden ? ' hidden-class' : '';
+                            legendDiv.innerHTML +=
+                                '<div class="item toggleable' + hiddenClass + '">' +
+                                '<input type="checkbox" ' + checkedAttr + ' onchange="toggleHotspotClass(\'wrisk\', ' + item.index + ', this.checked)">' +
+                                '<i style="background:' + item.color + '"></i> ' +
+                                item.label + '</div>';
+                        });
+                    }
                     
                     legendDiv.innerHTML += '<p style="margin-top:10px; font-size:11px; color:#777;">Getis-Ord Gi* hot spot analysis at commune level</p>';
                     return;
@@ -1243,7 +1265,6 @@
                 var config = layerConfigs[layerId];
                 if (!config) return;
                 
-                // Add separator between layer legends
                 if (idx > 0) {
                     legendDiv.innerHTML += '<div style="margin:10px 0; border-top:1px solid #ddd;"></div>';
                 }
@@ -1336,7 +1357,7 @@
                     layerConfigs[key].name + '</label>';
             });
             
-            // Hotspot polygon layer (separate from raster configs)
+            // Hotspot polygon layer
             div.innerHTML += 
                 '<label><input type="checkbox" name="layer" value="hotspot" ' + 
                 'onchange="toggleLayer(\'hotspot\', this.checked)">Hot Spot Analysis (Commune)</label>';
@@ -1354,7 +1375,7 @@
             div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">High-Risk Regions</label>';
             div.innerHTML += '</div>';
             
-            // Opacity sliders section - All layers default to 60%
+            // Opacity sliders section
             div.innerHTML += '<div class="opacity-section">';
             div.innerHTML += '<h5>Layer Opacity</h5>';
             
@@ -1393,8 +1414,6 @@
         };
         legend.addTo(map);
 
-        // Info box removed
-
         // Add right-click handler to copy coordinates
         map.on('contextmenu', function(e) {
             copyCoordinatesToClipboard(e.latlng.lat, e.latlng.lng);
@@ -1402,30 +1421,24 @@
 
         // Add left-click handler to show cell value from CURRENT layer only
         map.on('click', function(e) {
-            // Check if current layer is loaded
             if (!currentLayer || !georasters[currentLayer]) {
                 return;
             }
             
-            // Get value from the currently visible layer only
             var value = getRasterValueAtPoint(currentLayer, e.latlng);
             var config = layerConfigs[currentLayer];
             
-            // Format display value based on layer type
             var displayValue;
             if (value !== null) {
                 if (config.discreteDisplay) {
-                    // For discrete layers (risk, hotspot), show integer
                     displayValue = Math.round(value).toString();
                 } else {
-                    // For continuous layers (ENM, Elevation), show 4 decimal places
                     displayValue = value.toFixed(4);
                 }
             } else {
                 displayValue = 'No Data';
             }
             
-            // Add unit suffix for elevation
             var unitSuffix = '';
             if (currentLayer === 'elevation' && value !== null) {
                 unitSuffix = ' m';

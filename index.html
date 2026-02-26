@@ -31,6 +31,8 @@
             border-radius: 5px;
             box-shadow: 0 0 15px rgba(0,0,0,0.2);
             max-width: 250px;
+            max-height: 70vh;
+            overflow-y: auto;
         }
         
         .legend h4 { margin: 0 0 8px; font-size: 14px; }
@@ -318,6 +320,12 @@
         map.createPane('analysisPane');
         map.getPane('analysisPane').style.zIndex = 310;
         
+        map.createPane('speciesRasterPane');
+        map.getPane('speciesRasterPane').style.zIndex = 315;
+        
+        map.createPane('speciesVectorPane');
+        map.getPane('speciesVectorPane').style.zIndex = 320;
+        
         map.createPane('boundariesPane');
         map.getPane('boundariesPane').style.zIndex = 350;
 
@@ -341,12 +349,49 @@
         var currentLayer = null;
         var activeLayers = {};
         var loadedCount = 0;
-        var totalLayers = 3;
+        var totalLayers = 4; // enm, risk, elevation, species_richness (hotspot counted separately)
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
         var hotspotPolygonLayer = null;
         var hotspotPolygonData = null;
         var hotspotDisplayMode = 'Gi_Cluster'; // 'Gi_Cluster' or 'WRisk'
+
+        // Species and Survey GeoJSON layers
+        var speciesSurveyLayers = {};
+        var speciesSurveyConfigs = {
+            'gbif_species': {
+                file: 'GBIF_species.json',
+                name: 'GBIF Species Occurrences',
+                color: '#8B5CF6',
+                fillColor: '#8B5CF6',
+                radius: 5,
+                icon: 'circle'
+            },
+            'plague_ankazobe': {
+                file: 'plague_ankazobe_survey.json',
+                name: 'Plague Survey – Ankazobe',
+                color: '#F59E0B',
+                fillColor: '#F59E0B',
+                radius: 6,
+                icon: 'diamond'
+            },
+            'plague_flea': {
+                file: 'plague_flea_survey.json',
+                name: 'Plague Flea Survey',
+                color: '#10B981',
+                fillColor: '#10B981',
+                radius: 6,
+                icon: 'triangle'
+            },
+            'plague_makira': {
+                file: 'plague_makira_survey.json',
+                name: 'Plague Survey – Makira',
+                color: '#EC4899',
+                fillColor: '#EC4899',
+                radius: 6,
+                icon: 'square'
+            }
+        };
 
         // Default opacity for all layers
         var DEFAULT_OPACITY = 0.8;
@@ -355,6 +400,7 @@
         var hiddenClasses = {
             'risk': {},
             'elevation': {},
+            'species_richness': {},
             'hotspot_gi': {},
             'hotspot_wrisk': {}
         };
@@ -375,13 +421,13 @@
                 file: 'risk_zones_cog.tif',
                 name: 'Plague Exposure Risk Index',
                 discreteColors: {
-                    0: '#000000',  // Black - No risk/background
-                    1: '#FFFFBE',  // Light yellow - Very low risk
-                    2: '#FFDD00',  // Yellow - Low risk
-                    3: '#FFAA00',  // Orange - Moderate risk
-                    4: '#FF6600',  // Red-orange - Elevated risk
-                    6: '#FF0000',  // Red - High risk
-                    9: '#A80000'   // Dark red - Very high risk
+                    0: '#000000',
+                    1: '#FFFFBE',
+                    2: '#FFDD00',
+                    3: '#FFAA00',
+                    4: '#FF6600',
+                    6: '#FF0000',
+                    9: '#A80000'
                 },
                 labels: ['No Risk', 'Very High Risk'],
                 description: 'Plague Transmission Risk Zones',
@@ -413,6 +459,28 @@
                     { value: 3, color: '#808080', label: '560 – 916 m' },
                     { value: 4, color: '#404040', label: '916 – 1,314 m' },
                     { value: 5, color: '#000000', label: '1,314 – 2,747 m' }
+                ]
+            },
+            'species_richness': {
+                file: 'species_richness.tif',
+                name: 'Species Richness',
+                description: 'Species richness index',
+                customLegend: true,
+                discreteDisplay: true,
+                isSpeciesLayer: true,
+                discreteColors: {
+                    1: '#edf8fb',
+                    2: '#b2e2e2',
+                    3: '#66c2a4',
+                    4: '#2ca25f',
+                    5: '#006d2c'
+                },
+                legendItems: [
+                    { value: 1, color: '#edf8fb', label: '1 – Very Low' },
+                    { value: 2, color: '#b2e2e2', label: '2 – Low' },
+                    { value: 3, color: '#66c2a4', label: '3 – Moderate' },
+                    { value: 4, color: '#2ca25f', label: '4 – High' },
+                    { value: 5, color: '#006d2c', label: '5 – Very High' }
                 ]
             }
         };
@@ -732,7 +800,136 @@
             }
         }
 
+        // =====================================================================
+        // Species and Survey Data - GeoJSON layers
+        // =====================================================================
+
+        // SVG icon generators for different marker shapes
+        function createSvgIcon(shape, color, size) {
+            var s = size || 12;
+            var svg;
+            
+            if (shape === 'diamond') {
+                var half = s / 2;
+                svg = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" xmlns="http://www.w3.org/2000/svg">' +
+                      '<polygon points="' + half + ',0 ' + s + ',' + half + ' ' + half + ',' + s + ' 0,' + half + '" ' +
+                      'fill="' + color + '" stroke="#fff" stroke-width="1"/></svg>';
+            } else if (shape === 'triangle') {
+                svg = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" xmlns="http://www.w3.org/2000/svg">' +
+                      '<polygon points="' + (s/2) + ',0 ' + s + ',' + s + ' 0,' + s + '" ' +
+                      'fill="' + color + '" stroke="#fff" stroke-width="1"/></svg>';
+            } else if (shape === 'square') {
+                svg = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" xmlns="http://www.w3.org/2000/svg">' +
+                      '<rect x="1" y="1" width="' + (s-2) + '" height="' + (s-2) + '" ' +
+                      'fill="' + color + '" stroke="#fff" stroke-width="1"/></svg>';
+            } else {
+                // Default circle
+                return null; // use circleMarker instead
+            }
+            
+            return L.divIcon({
+                html: svg,
+                className: '',
+                iconSize: [s, s],
+                iconAnchor: [s/2, s/2]
+            });
+        }
+        
+        function loadSpeciesSurveyLayer(layerId) {
+            var config = speciesSurveyConfigs[layerId];
+            
+            fetch(config.file)
+                .then(response => {
+                    if (!response.ok) throw new Error(config.name + ' file not found');
+                    return response.json();
+                })
+                .then(data => {
+                    var featureCount = data.features ? data.features.length : 0;
+                    updateStatus('Loaded ' + config.name + ' (' + featureCount + ' features)');
+                    
+                    var geojsonLayer = L.geoJSON(data, {
+                        pointToLayer: function(feature, latlng) {
+                            if (config.icon && config.icon !== 'circle') {
+                                var icon = createSvgIcon(config.icon, config.fillColor, 14);
+                                if (icon) {
+                                    return L.marker(latlng, { icon: icon, pane: 'speciesVectorPane' });
+                                }
+                            }
+                            return L.circleMarker(latlng, {
+                                color: '#FFFFFF',
+                                fillColor: config.fillColor,
+                                fillOpacity: 0.9,
+                                radius: config.radius,
+                                weight: 1,
+                                pane: 'speciesVectorPane'
+                            });
+                        },
+                        style: function(feature) {
+                            // For polygon/line features
+                            return {
+                                color: config.color,
+                                fillColor: config.fillColor,
+                                fillOpacity: 0.4,
+                                weight: 2,
+                                opacity: 0.8
+                            };
+                        },
+                        pane: 'speciesVectorPane',
+                        onEachFeature: function(feature, layer) {
+                            var popupContent = '<h3>' + config.name + '</h3><table>';
+                            
+                            for (var key in feature.properties) {
+                                if (feature.properties.hasOwnProperty(key)) {
+                                    var value = feature.properties[key];
+                                    if (value === null || value === undefined || value === '') continue;
+                                    var displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, function(l){ return l.toUpperCase() });
+                                    popupContent += '<tr><td>' + displayKey + '</td><td>' + value + '</td></tr>';
+                                }
+                            }
+                            
+                            popupContent += '</table>';
+                            layer.bindPopup(popupContent, { maxWidth: 300, maxHeight: 400 });
+                        }
+                    });
+                    
+                    speciesSurveyLayers[layerId] = geojsonLayer;
+                    // Don't add to map by default — user toggles on
+                })
+                .catch(error => {
+                    console.log(config.name + ' not found - layer will not be available:', error.message);
+                });
+        }
+        
+        function toggleSpeciesSurveyLayer(layerId, show) {
+            var lyr = speciesSurveyLayers[layerId];
+            if (!lyr) return;
+            
+            if (show) {
+                lyr.addTo(map);
+                activeLayers['species_' + layerId] = true;
+            } else {
+                map.removeLayer(lyr);
+                delete activeLayers['species_' + layerId];
+            }
+            updateLegend();
+        }
+        
+        function updateSpeciesSurveyOpacity(layerId, opacity) {
+            var lyr = speciesSurveyLayers[layerId];
+            if (!lyr) return;
+            
+            lyr.eachLayer(function(layer) {
+                if (layer.setStyle) {
+                    layer.setStyle({ fillOpacity: opacity, opacity: opacity });
+                } else if (layer.setOpacity) {
+                    layer.setOpacity(opacity);
+                }
+            });
+        }
+
+        // =====================================================================
         // Hotspot polygon color configurations
+        // =====================================================================
         var hotspotGiClusterColors = {
             3:  '#ca0020',
             2:  '#f4a582',
@@ -782,7 +979,6 @@
             return '#cccccc';
         }
         
-        // Get the WRisk class index for a given value (used for toggling)
         function getWRiskClassIndex(value) {
             if (value === null || value === undefined) return -1;
             for (var i = 0; i < hotspotWRiskBreaks.length - 1; i++) {
@@ -802,7 +998,6 @@
             
             if (hotspotDisplayMode === 'Gi_Cluster') {
                 var gi = feature.properties['Gi_Cluster'];
-                // Check if this Gi class is hidden
                 if (hiddenClasses['hotspot_gi'][gi]) {
                     isHidden = true;
                 }
@@ -810,7 +1005,6 @@
             } else {
                 var wriskVal = feature.properties['WRisk'];
                 var classIdx = getWRiskClassIndex(wriskVal);
-                // Check if this WRisk class is hidden
                 if (hiddenClasses['hotspot_wrisk'][classIdx]) {
                     isHidden = true;
                 }
@@ -903,6 +1097,7 @@
                 }
             }
             if (!currentLayer && activeLayers['elevation']) currentLayer = 'elevation';
+            if (!currentLayer && activeLayers['species_richness']) currentLayer = 'species_richness';
             
             updateLegend();
             updateHighRiskBoundaryStyle();
@@ -920,7 +1115,6 @@
             if (hotspotPolygonLayer) {
                 hotspotPolygonLayer.setStyle(function(feature) {
                     var style = getHotspotPolygonStyle(feature);
-                    // Only scale opacity for visible features
                     if (style.fillOpacity > 0) {
                         style.fillOpacity = opacity;
                         style.opacity = opacity;
@@ -930,7 +1124,6 @@
             }
         }
         
-        // Toggle individual hotspot legend classes
         function toggleHotspotClass(mode, classValue, show) {
             var key = (mode === 'gi') ? 'hotspot_gi' : 'hotspot_wrisk';
             if (show) {
@@ -938,7 +1131,6 @@
             } else {
                 hiddenClasses[key][classValue] = true;
             }
-            // Re-style the polygon layer
             if (hotspotPolygonLayer) {
                 hotspotPolygonLayer.setStyle(getHotspotPolygonStyle);
             }
@@ -983,7 +1175,7 @@
                     
                     var pixelValuesToColorFn;
                     
-                    if (layerId === 'risk' && config.discreteColors) {
+                    if ((layerId === 'risk' || layerId === 'species_richness') && config.discreteColors) {
                         var discreteColors = config.discreteColors;
                         pixelValuesToColorFn = function(values) {
                             var value = values[0];
@@ -994,7 +1186,7 @@
                                 return null;
                             }
                             var intValue = Math.round(value);
-                            if (hiddenClasses['risk'] && hiddenClasses['risk'][intValue]) {
+                            if (hiddenClasses[layerId] && hiddenClasses[layerId][intValue]) {
                                 return null;
                             }
                             if (discreteColors.hasOwnProperty(intValue)) {
@@ -1049,7 +1241,14 @@
                         };
                     }
                     
-                    var layerPane = (layerId === 'elevation') ? 'rasterPane' : 'analysisPane';
+                    var layerPane;
+                    if (layerId === 'elevation') {
+                        layerPane = 'rasterPane';
+                    } else if (config.isSpeciesLayer) {
+                        layerPane = 'speciesRasterPane';
+                    } else {
+                        layerPane = 'analysisPane';
+                    }
                     
                     var layer = new GeoRasterLayer({
                         georaster: georaster,
@@ -1064,6 +1263,7 @@
                     
                     updateStatus(config.name + ' ready! (' + loadedCount + '/' + totalLayers + ')');
                     
+                    // Auto-show only ENM on load; species_richness stays off by default
                     if (layerId === 'enm') {
                         Object.keys(activeLayers).forEach(function(id) {
                             if (id !== 'elevation') {
@@ -1076,8 +1276,8 @@
                         currentLayer = 'enm';
                         updateLegend();
                         updateHighRiskBoundaryStyle();
-                    } else if (layerId === 'elevation') {
-                        // Don't auto-show elevation on load
+                    } else if (layerId === 'elevation' || layerId === 'species_richness') {
+                        // Don't auto-show on load
                     } else if (!currentLayer) {
                         layer.addTo(map);
                         activeLayers[layerId] = true;
@@ -1101,6 +1301,13 @@
                         updateStatus('⚠️ CORS Error: You must serve files through a web server!', true);
                         updateStatus('Try using: R servr::httd() or Python http.server', true);
                     }
+                    
+                    loadedCount++;
+                    if (loadedCount === totalLayers) {
+                        setTimeout(function() {
+                            document.getElementById('loading').style.display = 'none';
+                        }, 1000);
+                    }
                 });
         }
 
@@ -1120,6 +1327,7 @@
                 delete activeLayers[layerId];
             }
             
+            // Determine current layer for click-query and legend
             var analysisLayers = ['enm', 'risk', 'hotspot'];
             currentLayer = null;
             for (var i = analysisLayers.length - 1; i >= 0; i--) {
@@ -1127,6 +1335,9 @@
                     currentLayer = analysisLayers[i];
                     break;
                 }
+            }
+            if (!currentLayer && activeLayers['species_richness']) {
+                currentLayer = 'species_richness';
             }
             if (!currentLayer && activeLayers['elevation']) {
                 currentLayer = 'elevation';
@@ -1167,7 +1378,7 @@
             
             var pixelValuesToColorFn;
             
-            if (layerId === 'risk' && config.discreteColors) {
+            if ((layerId === 'risk' || layerId === 'species_richness') && config.discreteColors) {
                 var discreteColors = config.discreteColors;
                 var hidden = hiddenClasses[layerId];
                 pixelValuesToColorFn = function(values) {
@@ -1202,7 +1413,14 @@
             
             if (!pixelValuesToColorFn) return;
             
-            var layerPane = (layerId === 'elevation') ? 'rasterPane' : 'analysisPane';
+            var layerPane;
+            if (layerId === 'elevation') {
+                layerPane = 'rasterPane';
+            } else if (config.isSpeciesLayer) {
+                layerPane = 'speciesRasterPane';
+            } else {
+                layerPane = 'analysisPane';
+            }
             
             var newLayer = new GeoRasterLayer({
                 georaster: georaster,
@@ -1226,6 +1444,11 @@
             }
             
             activeKeys.forEach(function(layerId, idx) {
+                // Skip species survey vector layers - they get their own section below
+                if (layerId.startsWith('species_') && layerId !== 'species_richness') {
+                    return;
+                }
+                
                 // Handle hotspot polygon layer separately
                 if (layerId === 'hotspot') {
                     if (idx > 0) {
@@ -1239,7 +1462,6 @@
                     legendDiv.innerHTML += '<h4>Hot Spot Analysis – Commune (' + modeName + ')</h4>';
                     
                     if (hotspotDisplayMode === 'Gi_Cluster') {
-                        // Interactive Gi* Cluster legend
                         hotspotGiClusterLegendItems.forEach(function(item) {
                             var isHidden = hiddenClasses['hotspot_gi'][item.value];
                             var checkedAttr = isHidden ? '' : 'checked';
@@ -1251,7 +1473,6 @@
                                 item.label + '</div>';
                         });
                     } else {
-                        // Interactive Weighted Risk legend (highest risk at top)
                         for (var i = hotspotWRiskLegendItems.length - 1; i >= 0; i--) {
                             var item = hotspotWRiskLegendItems[i];
                             var isHidden = hiddenClasses['hotspot_wrisk'][item.index];
@@ -1329,6 +1550,41 @@
                 }
             });
             
+            // Add Species & Survey Data legend entries for active vector layers
+            var activeSpeciesVectors = [];
+            Object.keys(speciesSurveyConfigs).forEach(function(key) {
+                if (activeLayers['species_' + key]) {
+                    activeSpeciesVectors.push(key);
+                }
+            });
+            
+            if (activeSpeciesVectors.length > 0) {
+                legendDiv.innerHTML += '<div style="margin:10px 0; border-top:1px solid #ddd;"></div>';
+                legendDiv.innerHTML += '<h4>Species & Survey Data</h4>';
+                
+                activeSpeciesVectors.forEach(function(key) {
+                    var cfg = speciesSurveyConfigs[key];
+                    var symbolHtml;
+                    
+                    if (cfg.icon === 'diamond') {
+                        symbolHtml = '<svg width="14" height="14" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:8px;">' +
+                                     '<polygon points="7,0 14,7 7,14 0,7" fill="' + cfg.fillColor + '" stroke="#fff" stroke-width="1"/></svg>';
+                    } else if (cfg.icon === 'triangle') {
+                        symbolHtml = '<svg width="14" height="14" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:8px;">' +
+                                     '<polygon points="7,0 14,14 0,14" fill="' + cfg.fillColor + '" stroke="#fff" stroke-width="1"/></svg>';
+                    } else if (cfg.icon === 'square') {
+                        symbolHtml = '<svg width="14" height="14" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:8px;">' +
+                                     '<rect x="1" y="1" width="12" height="12" fill="' + cfg.fillColor + '" stroke="#fff" stroke-width="1"/></svg>';
+                    } else {
+                        symbolHtml = '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' + cfg.fillColor + 
+                                     ';border:1px solid #FFFFFF;margin-right:8px;vertical-align:middle;"></span>';
+                    }
+                    
+                    legendDiv.innerHTML += '<div class="item">' + symbolHtml +
+                        '<span style="font-size:11px;">' + cfg.name + '</span></div>';
+                });
+            }
+            
             // Add plague cases legend section if plague cases are loaded
             if (plagueCasesLayer) {
                 legendDiv.innerHTML += 
@@ -1356,7 +1612,8 @@
             // Risk layers section
             div.innerHTML += '<h4 style="margin-top:15px; padding-top:10px; border-top: 1px solid #ddd;">Risk Layers</h4>';
             
-            Object.keys(layerConfigs).forEach(function(key) {
+            // Only show the original risk layers (enm, risk, elevation) here
+            ['enm', 'risk', 'elevation'].forEach(function(key) {
                 var checked = (key === 'enm') ? 'checked' : '';
                 div.innerHTML += 
                     '<label><input type="checkbox" name="layer" value="' + key + '" ' + checked + 
@@ -1375,6 +1632,26 @@
             div.innerHTML += '<label><input type="radio" name="hotspot-mode" value="WRisk" onchange="switchHotspotMode(\'WRisk\')" style="margin-right:4px;">Weighted Risk</label>';
             div.innerHTML += '</div>';
             
+            // =====================================================================
+            // Species and Survey Data section
+            // =====================================================================
+            div.innerHTML += '<h4 style="margin-top:15px; padding-top:10px; border-top: 1px solid #ddd;">Species &amp; Survey Data</h4>';
+            
+            // GeoJSON vector layers first
+            Object.keys(speciesSurveyConfigs).forEach(function(key) {
+                var cfg = speciesSurveyConfigs[key];
+                div.innerHTML += 
+                    '<label><input type="checkbox" name="species-layer" value="' + key + '" ' + 
+                    'onchange="toggleSpeciesSurveyLayer(\'' + key + '\', this.checked)">' + 
+                    cfg.name + '</label>';
+            });
+            
+            // Species richness raster below the GeoJSON layers
+            div.innerHTML += 
+                '<label><input type="checkbox" name="layer" value="species_richness" ' + 
+                'onchange="toggleLayer(\'species_richness\', this.checked)">' + 
+                layerConfigs['species_richness'].name + '</label>';
+            
             // Overlay section
             div.innerHTML += '<div class="overlay-section">';
             div.innerHTML += '<h5>Overlays</h5>';
@@ -1386,7 +1663,8 @@
             div.innerHTML += '<div class="opacity-section">';
             div.innerHTML += '<h5>Layer Opacity</h5>';
             
-            Object.keys(layerConfigs).forEach(function(key) {
+            // Opacity for original risk layers
+            ['enm', 'risk', 'elevation'].forEach(function(key) {
                 div.innerHTML += 
                     '<div class="opacity-control">' +
                     '<label>' + layerConfigs[key].name + ' <span class="opacity-value" id="opacity-value-' + key + '">' + Math.round(DEFAULT_OPACITY * 100) + '%</span></label>' +
@@ -1401,6 +1679,25 @@
                 '<label>Hot Spot Analysis (Commune) <span class="opacity-value" id="opacity-value-hotspot">' + Math.round(DEFAULT_OPACITY * 100) + '%</span></label>' +
                 '<input type="range" id="opacity-hotspot" min="0" max="100" value="' + (DEFAULT_OPACITY * 100) + '" ' +
                 'oninput="updateHotspotOpacity(this.value/100); document.getElementById(\'opacity-value-hotspot\').textContent = this.value + \'%\'">' +
+                '</div>';
+            
+            // Species & Survey opacity sliders
+            Object.keys(speciesSurveyConfigs).forEach(function(key) {
+                var cfg = speciesSurveyConfigs[key];
+                div.innerHTML += 
+                    '<div class="opacity-control">' +
+                    '<label>' + cfg.name + ' <span class="opacity-value" id="opacity-value-species-' + key + '">' + Math.round(DEFAULT_OPACITY * 100) + '%</span></label>' +
+                    '<input type="range" id="opacity-species-' + key + '" min="0" max="100" value="' + (DEFAULT_OPACITY * 100) + '" ' +
+                    'oninput="updateSpeciesSurveyOpacity(\'' + key + '\', this.value/100); document.getElementById(\'opacity-value-species-' + key + '\').textContent = this.value + \'%\'">' +
+                    '</div>';
+            });
+            
+            // Species richness raster opacity
+            div.innerHTML += 
+                '<div class="opacity-control">' +
+                '<label>' + layerConfigs['species_richness'].name + ' <span class="opacity-value" id="opacity-value-species_richness">' + Math.round(DEFAULT_OPACITY * 100) + '%</span></label>' +
+                '<input type="range" id="opacity-species_richness" min="0" max="100" value="' + (DEFAULT_OPACITY * 100) + '" ' +
+                'oninput="updateLayerOpacity(\'species_richness\', this.value/100); document.getElementById(\'opacity-value-species_richness\').textContent = this.value + \'%\'">' +
                 '</div>';
             
             div.innerHTML += '</div>';
@@ -1470,6 +1767,11 @@
         loadPlagueCases();
         loadHighRiskBoundaries();
         loadHotspotPolygons();
+        
+        // Load species and survey GeoJSON layers
+        Object.keys(speciesSurveyConfigs).forEach(function(key) {
+            loadSpeciesSurveyLayer(key);
+        });
     </script>
 </body>
 </html>

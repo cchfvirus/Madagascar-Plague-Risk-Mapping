@@ -702,7 +702,7 @@
                             });
                         },
                         onEachFeature: function(feature, layer) {
-                            var popupContent = '<h3>Plague Case</h3><table>';
+                            var popupContent = '<h3>Plague Case (1939–2024)</h3><table>';
                             
                             for (var key in feature.properties) {
                                 if (feature.properties.hasOwnProperty(key)) {
@@ -809,15 +809,15 @@
                 var half = s / 2;
                 svg = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" xmlns="http://www.w3.org/2000/svg">' +
                       '<polygon points="' + half + ',0 ' + s + ',' + half + ' ' + half + ',' + s + ' 0,' + half + '" ' +
-                      'fill="' + color + '" stroke="#fff" stroke-width="1"/></svg>';
+                      'fill="' + color + '" stroke="#fff" stroke-width="1.5"/></svg>';
             } else if (shape === 'triangle') {
                 svg = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" xmlns="http://www.w3.org/2000/svg">' +
                       '<polygon points="' + (s/2) + ',0 ' + s + ',' + s + ' 0,' + s + '" ' +
-                      'fill="' + color + '" stroke="#fff" stroke-width="1"/></svg>';
+                      'fill="' + color + '" stroke="#fff" stroke-width="1.5"/></svg>';
             } else if (shape === 'square') {
                 svg = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" xmlns="http://www.w3.org/2000/svg">' +
                       '<rect x="1" y="1" width="' + (s-2) + '" height="' + (s-2) + '" ' +
-                      'fill="' + color + '" stroke="#fff" stroke-width="1"/></svg>';
+                      'fill="' + color + '" stroke="#fff" stroke-width="1.5"/></svg>';
             } else {
                 // Default circle
                 return null; // use circleMarker instead
@@ -856,7 +856,7 @@
                                 fillColor: config.fillColor,
                                 fillOpacity: 0.9,
                                 radius: config.radius,
-                                weight: 1,
+                                weight: 1.5,
                                 pane: 'speciesVectorPane'
                             });
                         },
@@ -1632,7 +1632,7 @@
                     '<div class="plague-cases-section">' +
                     '<div class="item">' +
                     '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#0096FF;border:1px solid #FFFFFF;margin-right:8px;vertical-align:middle;"></span>' +
-                    '<span style="font-size:11px;">Plague Cases</span>' +
+                    '<span style="font-size:11px;">Plague Cases (1939–2024)</span>' +
                     '</div>' +
                     '</div>';
             }
@@ -1696,8 +1696,8 @@
             // Overlay section
             div.innerHTML += '<div class="overlay-section">';
             div.innerHTML += '<h5>Overlays</h5>';
-            div.innerHTML += '<label><input type="checkbox" id="plague-cases-toggle" checked onchange="togglePlagueCases(this.checked)">Plague Cases</label>';
-            div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">High-Risk Regions</label>';
+            div.innerHTML += '<label><input type="checkbox" id="plague-cases-toggle" checked onchange="togglePlagueCases(this.checked)">Plague Cases (1939–2024)</label>';
+            div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">Madagascar – ADMIN2</label>';
             div.innerHTML += '</div>';
             
             // Opacity sliders section

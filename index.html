@@ -364,7 +364,8 @@
                 name: 'GBIF Species Occurrences',
                 color: '#8B5CF6',
                 fillColor: '#8B5CF6',
-                radius: 5,
+                radius: 6,
+                weight: 2,
                 icon: 'circle'
             },
             'plague_ankazobe': {
@@ -856,7 +857,7 @@
                                 fillColor: config.fillColor,
                                 fillOpacity: 0.9,
                                 radius: config.radius,
-                                weight: 1.5,
+                                weight: config.weight || 2,
                                 pane: 'speciesVectorPane'
                             });
                         },

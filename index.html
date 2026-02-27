@@ -340,8 +340,8 @@
             maxZoom: 19
         });
 
-        // Add default basemap (Street Map)
-        streetMap.addTo(map);
+        // Add default basemap (Satellite)
+        satelliteMap.addTo(map);
 
         // Store layers and georasters
         var layers = {};
@@ -737,13 +737,20 @@
                     
                     plagueCasesLayer = L.geoJSON(data, {
                         pointToLayer: function(feature, latlng) {
-                            return L.circleMarker(latlng, {
-                                color: '#FFFFFF',
-                                fillColor: '#0096FF',
-                                fillOpacity: 1,
-                                radius: 7,
-                                weight: 1
+                            // Target/bullseye SVG icon
+                            var size = 18;
+                            var svg = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
+                                '<circle cx="12" cy="12" r="11" fill="#FF2200" fill-opacity="0.15" stroke="#FF2200" stroke-width="1.5"/>' +
+                                '<circle cx="12" cy="12" r="7" fill="none" stroke="#FF2200" stroke-width="1.5"/>' +
+                                '<circle cx="12" cy="12" r="3" fill="#FF2200" stroke="#FFFFFF" stroke-width="0.8"/>' +
+                                '</svg>';
+                            var icon = L.divIcon({
+                                html: svg,
+                                className: '',
+                                iconSize: [size, size],
+                                iconAnchor: [size/2, size/2]
                             });
+                            return L.marker(latlng, { icon: icon });
                         },
                         onEachFeature: function(feature, layer) {
                             var popupContent = '<h3>Plague Case (1939–2024)</h3><table>';
@@ -1838,7 +1845,11 @@
                 legendDiv.innerHTML += 
                     '<div class="plague-cases-section">' +
                     '<div class="item">' +
-                    '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#0096FF;border:1px solid #FFFFFF;margin-right:8px;vertical-align:middle;"></span>' +
+                    '<svg width="16" height="16" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:8px;" xmlns="http://www.w3.org/2000/svg">' +
+                    '<circle cx="12" cy="12" r="11" fill="#FF2200" fill-opacity="0.15" stroke="#FF2200" stroke-width="1.5"/>' +
+                    '<circle cx="12" cy="12" r="7" fill="none" stroke="#FF2200" stroke-width="1.5"/>' +
+                    '<circle cx="12" cy="12" r="3" fill="#FF2200" stroke="#FFFFFF" stroke-width="0.8"/>' +
+                    '</svg>' +
                     '<span style="font-size:11px;">Plague Cases (1939–2024)</span>' +
                     '</div>' +
                     '</div>';
@@ -1854,8 +1865,8 @@
             
             // Basemap section
             div.innerHTML = '<h4>Basemaps</h4>';
-            div.innerHTML += '<label><input type="radio" name="basemap" value="street" checked onchange="switchBasemap(\'street\')">Street Map</label>';
-            div.innerHTML += '<label><input type="radio" name="basemap" value="satellite" onchange="switchBasemap(\'satellite\')">Satellite Imagery</label>';
+            div.innerHTML += '<label><input type="radio" name="basemap" value="street" onchange="switchBasemap(\'street\')">Street Map</label>';
+            div.innerHTML += '<label><input type="radio" name="basemap" value="satellite" checked onchange="switchBasemap(\'satellite\')">Satellite Imagery</label>';
             
             // Risk layers section
             div.innerHTML += '<h4 style="margin-top:15px; padding-top:10px; border-top: 1px solid #ddd;">Risk Layers</h4>';

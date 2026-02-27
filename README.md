@@ -1,12 +1,8 @@
 # Madagascar Plague Risk Mapping
 
-Plague continues to cause deadly outbreaks in Madagascar, yet health officials lack detailed maps showing where disease risk is highest. This detailed community-level risk assessment enables health authorities to target disease surveillance, prevention efforts, and resources to specific locations where plague is most likely to occur, potentially saving lives through earlier detection and response to outbreaks.
+Plague continues to cause deadly outbreaks in Madagascar, yet health officials lack detailed maps showing where disease risk is highest. This detailed community-level risk assessment enables health authorities to target disease surveillance, prevention efforts, and resources to specific locations where plague is most likely to occur, potentially saving lives through earlier detection and response to outbreaks. This interactive web-based mapping application is designed to visualizing plague ecology, transmission risk, and species distribution data across Madagascar. Built with Leaflet.js, the application renders GeoTIFF raster layers directly in the browser and overlays vector data from GeoJSON sources, providing a comprehensive spatial decision-support tool for plague surveillance and research.
 
 # Explore the interactive map: https://cchfvirus.github.io/Madagascar-Plague-Risk-Mapping/
-
-# Plague Risk Mapping – Interactive Web Map
-
-An interactive web-based mapping application for visualizing plague ecology, transmission risk, and species distribution data across central Madagascar. Built with Leaflet.js, the application renders GeoTIFF raster layers directly in the browser and overlays vector data from GeoJSON sources, providing a comprehensive spatial decision-support tool for plague surveillance and research.
 
 ---
 

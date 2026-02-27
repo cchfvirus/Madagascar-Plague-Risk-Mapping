@@ -443,6 +443,7 @@
         
         // Track hidden classes per layer (for toggleable legend items)
         var hiddenClasses = {
+            'enm': {},
             'risk': {},
             'elevation': {},
             'species_richness': {},
@@ -455,12 +456,20 @@
             'enm': {
                 file: 'enm_cog.tif',
                 name: 'Ecological Niche Model (1km)',
-                colors: ['#636363', '#fed976', '#feb24c', '#fd8d3c', '#b10026', '#b10026', '#b10026'],
-                domain: [0, 1],
-                labels: ['Low Suitability', 'High Suitability'],
-                description: '',
-                mode: 'lch',
-                continuousLegend: true
+                description: 'Habitat suitability classified by standard deviation from mean (μ=0.161, σ=0.237)',
+                customLegend: true,
+                discreteDisplay: false,
+                // Computed from raster: mean=0.160755, sd=0.237195
+                enmMean: 0.160755,
+                enmSD: 0.237195,
+                enmBreaks: [0.160755, 0.397950, 0.635145],  // mean, +1SD, +2SD
+                enmColors: ['#969696', '#fed976', '#fd8d3c', '#e31a1c', '#67000d'],
+                legendItems: [
+                    { value: 1, color: '#969696', label: '< Mean (< 0.161) – Low Suitability' },
+                    { value: 2, color: '#fed976', label: 'Mean to +1 SD (0.161 – 0.398)' },
+                    { value: 3, color: '#fd8d3c', label: '+1 SD to +2 SD (0.398 – 0.635)' },
+                    { value: 4, color: '#e31a1c', label: '> +2 SD (> 0.635) – Very High' }
+                ]
             },
             'risk': {
                 file: 'risk_zones_cog.tif',
@@ -1353,7 +1362,23 @@
                     
                     var pixelValuesToColorFn;
                     
-                    if ((layerId === 'risk') && config.discreteColors) {
+                    if (layerId === 'enm' && config.enmBreaks) {
+                        var enmBreaks = config.enmBreaks;
+                        var enmColors = config.enmColors;
+                        pixelValuesToColorFn = function(values) {
+                            var value = values[0];
+                            if (value === null || value === undefined || isNaN(value)) return null;
+                            if (value === 255 || value === -9999 || value === -32768 ||
+                                value === -3.4e38 || Math.abs(value) > 1e10) return null;
+                            var classVal;
+                            if (value < enmBreaks[0]) classVal = 1;
+                            else if (value < enmBreaks[1]) classVal = 2;
+                            else if (value < enmBreaks[2]) classVal = 3;
+                            else classVal = 4;
+                            if (hiddenClasses['enm'] && hiddenClasses['enm'][classVal]) return null;
+                            return enmColors[classVal - 1];
+                        };
+                    } else if ((layerId === 'risk') && config.discreteColors) {
                         var discreteColors = config.discreteColors;
                         pixelValuesToColorFn = function(values) {
                             var value = values[0];
@@ -1582,7 +1607,24 @@
             
             var pixelValuesToColorFn;
             
-            if ((layerId === 'risk') && config.discreteColors) {
+            if (layerId === 'enm' && config.enmBreaks) {
+                var enmBreaks = config.enmBreaks;
+                var enmColors = config.enmColors;
+                var hidden = hiddenClasses['enm'];
+                pixelValuesToColorFn = function(values) {
+                    var value = values[0];
+                    if (value === null || value === undefined || isNaN(value)) return null;
+                    if (value === 255 || value === -9999 || value === -32768 ||
+                        value === -3.4e38 || Math.abs(value) > 1e10) return null;
+                    var classVal;
+                    if (value < enmBreaks[0]) classVal = 1;
+                    else if (value < enmBreaks[1]) classVal = 2;
+                    else if (value < enmBreaks[2]) classVal = 3;
+                    else classVal = 4;
+                    if (hidden[classVal]) return null;
+                    return enmColors[classVal - 1];
+                };
+            } else if ((layerId === 'risk') && config.discreteColors) {
                 var discreteColors = config.discreteColors;
                 var hidden = hiddenClasses[layerId];
                 pixelValuesToColorFn = function(values) {
@@ -2032,8 +2074,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-

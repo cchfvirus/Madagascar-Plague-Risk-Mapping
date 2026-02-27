@@ -738,7 +738,7 @@
                     plagueCasesLayer = L.geoJSON(data, {
                         pointToLayer: function(feature, latlng) {
                             // Target/bullseye SVG icon
-                            var size = 18;
+                            var size = 24;
                             var svg = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
                                 '<circle cx="12" cy="12" r="11" fill="white" stroke="#000000" stroke-width="1.5"/>' +
                                 '<circle cx="12" cy="12" r="7" fill="white" stroke="#000000" stroke-width="1.5"/>' +
@@ -860,15 +860,15 @@
                 var half = s / 2;
                 svg = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" xmlns="http://www.w3.org/2000/svg">' +
                       '<polygon points="' + half + ',0 ' + s + ',' + half + ' ' + half + ',' + s + ' 0,' + half + '" ' +
-                      'fill="' + color + '" stroke="#fff" stroke-width="1.5"/></svg>';
+                      'fill="' + color + '" stroke="#000" stroke-width="1.5"/></svg>';
             } else if (shape === 'triangle') {
                 svg = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" xmlns="http://www.w3.org/2000/svg">' +
                       '<polygon points="' + (s/2) + ',0 ' + s + ',' + s + ' 0,' + s + '" ' +
-                      'fill="' + color + '" stroke="#fff" stroke-width="1.5"/></svg>';
+                      'fill="' + color + '" stroke="#000" stroke-width="1.5"/></svg>';
             } else if (shape === 'square') {
                 svg = '<svg width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '" xmlns="http://www.w3.org/2000/svg">' +
                       '<rect x="1" y="1" width="' + (s-2) + '" height="' + (s-2) + '" ' +
-                      'fill="' + color + '" stroke="#fff" stroke-width="1.5"/></svg>';
+                      'fill="' + color + '" stroke="#000" stroke-width="1.5"/></svg>';
             } else {
                 // Default circle
                 return null; // use circleMarker instead
@@ -941,7 +941,7 @@
                                 var roleColor = getGbifRoleColor(role);
                                 
                                 return L.circleMarker(latlng, {
-                                    color: '#FFFFFF',
+                                    color: '#000000',
                                     fillColor: roleColor,
                                     fillOpacity: 0.9,
                                     radius: config.radius,
@@ -957,7 +957,7 @@
                                 }
                             }
                             return L.circleMarker(latlng, {
-                                color: '#FFFFFF',
+                                color: '#000000',
                                 fillColor: config.fillColor,
                                 fillOpacity: 0.9,
                                 radius: config.radius,
@@ -1041,7 +1041,7 @@
                         var roleColor = getGbifRoleColor(r);
                         
                         return L.circleMarker(latlng, {
-                            color: '#FFFFFF',
+                            color: '#000000',
                             fillColor: roleColor,
                             fillOpacity: 0.9,
                             radius: config.radius,
@@ -1810,7 +1810,7 @@
                                 '<div class="item toggleable' + hiddenClass + '">' +
                                 '<input type="checkbox" ' + checkedAttr + ' onchange="toggleGbifRole(\'' + escapedRole + '\', this.checked)">' +
                                 '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' + color + 
-                                ';border:2px solid #FFFFFF;margin-right:6px;vertical-align:middle;box-shadow:0 0 2px rgba(0,0,0,0.3);"></span>' +
+                                ';border:2px solid #000000;margin-right:6px;vertical-align:middle;box-shadow:0 0 2px rgba(0,0,0,0.3);"></span>' +
                                 '<span style="font-size:11px;">' + role + ' <span style="color:#999;">(' + count + ')</span></span>' +
                                 '</div>';
                         });
@@ -1823,16 +1823,16 @@
                     
                     if (cfg.icon === 'diamond') {
                         symbolHtml = '<svg width="14" height="14" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:8px;">' +
-                                     '<polygon points="7,0 14,7 7,14 0,7" fill="' + cfg.fillColor + '" stroke="#fff" stroke-width="1"/></svg>';
+                                     '<polygon points="7,0 14,7 7,14 0,7" fill="' + cfg.fillColor + '" stroke="#000" stroke-width="1"/></svg>';
                     } else if (cfg.icon === 'triangle') {
                         symbolHtml = '<svg width="14" height="14" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:8px;">' +
-                                     '<polygon points="7,0 14,14 0,14" fill="' + cfg.fillColor + '" stroke="#fff" stroke-width="1"/></svg>';
+                                     '<polygon points="7,0 14,14 0,14" fill="' + cfg.fillColor + '" stroke="#000" stroke-width="1"/></svg>';
                     } else if (cfg.icon === 'square') {
                         symbolHtml = '<svg width="14" height="14" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:8px;">' +
-                                     '<rect x="1" y="1" width="12" height="12" fill="' + cfg.fillColor + '" stroke="#fff" stroke-width="1"/></svg>';
+                                     '<rect x="1" y="1" width="12" height="12" fill="' + cfg.fillColor + '" stroke="#000" stroke-width="1"/></svg>';
                     } else {
                         symbolHtml = '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' + cfg.fillColor + 
-                                     ';border:1px solid #FFFFFF;margin-right:8px;vertical-align:middle;"></span>';
+                                     ';border:1px solid #000000;margin-right:8px;vertical-align:middle;"></span>';
                     }
                     
                     legendDiv.innerHTML += '<div class="item">' + symbolHtml +

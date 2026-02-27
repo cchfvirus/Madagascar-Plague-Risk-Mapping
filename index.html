@@ -862,7 +862,10 @@
                             });
                         },
                         style: function(feature) {
-                            // For polygon/line features
+                            // Only style polygon/line features — skip points so pointToLayer styles are preserved
+                            if (feature.geometry && feature.geometry.type === 'Point') {
+                                return {};
+                            }
                             return {
                                 color: config.color,
                                 fillColor: config.fillColor,

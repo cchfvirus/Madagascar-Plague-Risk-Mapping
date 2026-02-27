@@ -461,10 +461,7 @@
                 labels: ['Low Suitability', 'High Suitability'],
                 description: '',
                 mode: 'lch',
-                continuousLegend: true,
-                // SD stats computed from raster (mean=0.161, sd=0.237)
-                enmMean: 0.160755,
-                enmSD: 0.237195
+                continuousLegend: true
             },
             'risk': {
                 file: 'risk_zones_cog.tif',
@@ -1745,68 +1742,12 @@
                     }
                     var gradientCSS = 'linear-gradient(to right, ' + gradientStops.join(', ') + ')';
                     
-                    // Build gradient bar with SD tick marks if enmMean/enmSD are available
-                    if (config.enmMean !== undefined && config.enmSD !== undefined) {
-                        var mean = config.enmMean;
-                        var sd = config.enmSD;
-                        var dMin = config.domain[0];
-                        var dMax = config.domain[1];
-                        var range = dMax - dMin;
-                        
-                        // SD marker positions as percentages
-                        var sdMarkers = [
-                            { label: 'μ', value: mean },
-                            { label: '+1σ', value: mean + sd },
-                            { label: '+2σ', value: mean + 2 * sd }
-                        ];
-                        // Only include markers within the domain
-                        sdMarkers = sdMarkers.filter(function(m) { return m.value >= dMin && m.value <= dMax; });
-                        
-                        // Container with relative positioning for tick marks
-                        legendDiv.innerHTML += '<div style="position:relative;">';
-                        legendDiv.innerHTML += '<div class="gradient-bar" style="background: ' + gradientCSS + '; position:relative;">';
-                        
-                        // Tick marks inside the gradient bar
-                        sdMarkers.forEach(function(m) {
-                            var pct = ((m.value - dMin) / range) * 100;
-                            legendDiv.innerHTML +=
-                                '<div style="position:absolute; left:' + pct + '%; top:0; bottom:0; width:2px; background:rgba(0,0,0,0.7);"></div>';
-                        });
-                        
-                        legendDiv.innerHTML += '</div>'; // close gradient-bar
-                        
-                        // Labels row below gradient
-                        legendDiv.innerHTML += '<div style="position:relative; height:28px; font-size:10px; margin-top:2px;">';
-                        
-                        // Min/max labels at edges
-                        legendDiv.innerHTML += '<span style="position:absolute; left:0; top:0; color:#666;">' + dMin.toFixed(1) + '</span>';
-                        legendDiv.innerHTML += '<span style="position:absolute; right:0; top:0; color:#666;">' + dMax.toFixed(1) + '</span>';
-                        
-                        // SD labels at tick positions
-                        sdMarkers.forEach(function(m) {
-                            var pct = ((m.value - dMin) / range) * 100;
-                            legendDiv.innerHTML +=
-                                '<span style="position:absolute; left:' + pct + '%; top:0; transform:translateX(-50%); text-align:center; line-height:1.2;">' +
-                                '<strong style="color:#000;">' + m.label + '</strong><br>' +
-                                '<span style="color:#666;">' + m.value.toFixed(2) + '</span>' +
-                                '</span>';
-                        });
-                        
-                        legendDiv.innerHTML += '</div>'; // close labels row
-                        legendDiv.innerHTML += '</div>'; // close container
-                        
-                        // Descriptive line
-                        legendDiv.innerHTML += '<div style="font-size:10px; color:#777; margin-top:4px;">μ = ' + mean.toFixed(3) + ', σ = ' + sd.toFixed(3) + '</div>';
-                        
-                    } else {
-                        // Standard continuous legend without SD marks
-                        legendDiv.innerHTML += 
-                            '<div class="gradient-bar" style="background: ' + gradientCSS + ';"></div>' +
-                            '<div class="gradient-labels">' +
-                            '<span>' + config.labels[0] + '</span>' +
-                            '<span>' + config.labels[1] + '</span>' +
-                            '</div>';
-                    }
+                    legendDiv.innerHTML += 
+                        '<div class="gradient-bar" style="background: ' + gradientCSS + ';"></div>' +
+                        '<div class="gradient-labels">' +
+                        '<span>' + config.labels[0] + '</span>' +
+                        '<span>' + config.labels[1] + '</span>' +
+                        '</div>';
                 } else {
                     var numGrades = 5;
                     var range = config.domain[1] - config.domain[0];

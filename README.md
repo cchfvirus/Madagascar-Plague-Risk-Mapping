@@ -67,7 +67,7 @@ All species and survey markers use black outlines for visibility against the sat
 
 ### **Overlay Layers**
 
-- **Plague Cases (1939–2024)** – Historical plague occurrence records displayed as white target/bullseye markers with black concentric rings. Each point is clickable to reveal case attributes in a popup. Displayed by default.
+- **Plague Cases (1939–2023)** – Historical plague occurrence records displayed as white target/bullseye markers with black concentric rings. Each point is clickable to reveal case attributes in a popup. Displayed by default.
 - **Madagascar ADMIN2 Boundaries** – District-level administrative boundaries rendered as outline-only polygons. Stroke color automatically adapts (white when the risk layer is active, black otherwise) for contrast.
 
 ### **Interactive Legend**
@@ -113,7 +113,7 @@ The application expects the following files in the same directory as `index.html
 | `risk_zones_cog.tif` | Cloud-Optimized GeoTIFF | Plague exposure risk index (discrete classes) |
 | `elevation.tif` | GeoTIFF | Digital elevation model (meters) |
 | `species_richness.tif` | GeoTIFF | Species richness per grid cell |
-| `cases.geojson` | GeoJSON (Point) | Historical plague cases (1939–2024) |
+| `cases.geojson` | GeoJSON (Point) | Historical plague cases (1939–2023) |
 | `admin2.json` | GeoJSON (Polygon) | Madagascar ADMIN2 district boundaries |
 | `hotspot_admin4.json` | GeoJSON (Polygon) | Commune-level Gi* hot spot analysis results |
 | `GBIF_species.geojson` | GeoJSON (Point) | GBIF species occurrences with `Role` attribute |

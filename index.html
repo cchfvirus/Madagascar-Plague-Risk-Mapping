@@ -183,19 +183,6 @@
             font-size: 11px;
         }
         
-        .loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.3);
-            z-index: 1000;
-            text-align: center;
-        }
-        
         .error {
             background: #ffebee;
             color: #c62828;
@@ -253,14 +240,11 @@
         .copy-notification.show {
             opacity: 1;
         }
-        
-        /* Export button */
     </style>
 </head>
 <body>
-    <div id="loading" class="loading">
-        <div>Loading map layers...</div>
-        <div id="load-status" style="margin-top: 10px; font-size: 12px;"></div>
+    <div id="loading" style="display:none;">
+        <div id="load-status"></div>
     </div>
     <div id="map"></div>
     <div id="copy-notification" class="copy-notification"></div>
@@ -272,7 +256,6 @@
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
     <script>
-        // CHANGE 1: Zoomed-out initial view — centered on Madagascar, zoom 7
         var map = L.map('map').setView([-19.5, 47.0], 8);
 
         // Create custom panes with specific z-index ordering
@@ -314,12 +297,12 @@
         var currentLayer = null;
         var activeLayers = {};
         var loadedCount = 0;
-        var totalLayers = 4; // enm, risk, elevation, species_richness (hotspot counted separately)
+        var totalLayers = 4;
         var plagueCasesLayer = null;
         var highRiskBoundariesLayer = null;
         var hotspotPolygonLayer = null;
         var hotspotPolygonData = null;
-        var hotspotDisplayMode = 'Gi_Cluster'; // 'Gi_Cluster' or 'WRisk'
+        var hotspotDisplayMode = 'Gi_Cluster';
 
         // =====================================================================
         // GBIF Role-based coloring for plague ecology
@@ -409,8 +392,6 @@
             'hotspot_wrisk': {}
         };
 
-        // Layer configurations
-        // CHANGE 2: Renamed "Plague Exposure Risk Index" → "Plague Exposure Risk Index (100m)"
         var layerConfigs = {
             'enm': {
                 file: 'enm_cog.tif',
@@ -589,12 +570,6 @@
         }
 
         function updateStatus(message, isError) {
-            var statusDiv = document.getElementById('load-status');
-            if (isError) {
-                statusDiv.innerHTML += '<div class="error">' + message + '</div>';
-            } else {
-                statusDiv.innerHTML += '<div>' + message + '</div>';
-            }
             console.log(message);
         }
 
@@ -841,7 +816,6 @@
                     speciesSurveyLayers[layerId] = geojsonLayer;
                     if (layerId === 'gbif_species') speciesSurveyLayers['gbif_species_data'] = data;
 
-                    // CHANGE 3: Auto-add all species/survey layers to map on load
                     geojsonLayer.addTo(map);
                     activeLayers['species_' + layerId] = true;
                     updateLegend();
@@ -1005,17 +979,13 @@
                         }
                     });
                     loadedCount++;
-                    updateStatus('Hot Spot Analysis (Commune) ready! (' + loadedCount + '/' + totalLayers + ')');
                     if (loadedCount === totalLayers) {
-                        setTimeout(function() { document.getElementById('loading').style.display = 'none'; }, 1000);
+                        document.getElementById('loading').style.display = 'none';
                     }
                 })
                 .catch(error => {
                     console.log('Hotspot admin4 file not found - layer will not be available');
                     loadedCount++;
-                    if (loadedCount === totalLayers) {
-                        setTimeout(function() { document.getElementById('loading').style.display = 'none'; }, 1000);
-                    }
                 });
         }
         
@@ -1069,15 +1039,12 @@
             fetch(config.file)
                 .then(response => {
                     if (!response.ok) throw new Error('HTTP error! status: ' + response.status);
-                    updateStatus(config.name + ' fetched successfully');
                     return response.arrayBuffer();
                 })
                 .then(arrayBuffer => {
-                    updateStatus('Parsing ' + config.name + '...');
                     return parseGeoraster(arrayBuffer);
                 })
                 .then(georaster => {
-                    updateStatus(config.name + ' parsed successfully');
                     georasters[layerId] = georaster;
                     console.log('Loaded ' + layerId + ' - noDataValue:', georaster.noDataValue);
                     
@@ -1156,10 +1123,7 @@
                     
                     layers[layerId] = layer;
                     loadedCount++;
-                    updateStatus(config.name + ' ready! (' + loadedCount + '/' + totalLayers + ')');
                     
-                    // CHANGE 4: Default active layer on load is 'risk' (not 'enm')
-                    // ENM and species_richness stay off by default; elevation stays off
                     if (layerId === 'risk') {
                         Object.keys(activeLayers).forEach(function(id) {
                             if (id !== 'elevation' && layers[id]) {
@@ -1183,20 +1147,14 @@
                     }
                     
                     if (loadedCount === totalLayers) {
-                        setTimeout(function() { document.getElementById('loading').style.display = 'none'; }, 1000);
+                        document.getElementById('loading').style.display = 'none';
                     }
                 })
                 .catch(error => {
-                    var errorMsg = 'Error loading ' + config.name + ': ' + error.message;
-                    updateStatus(errorMsg, true);
-                    console.error(errorMsg, error);
-                    if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
-                        updateStatus('⚠️ CORS Error: You must serve files through a web server!', true);
-                        updateStatus('Try using: R servr::httd() or Python http.server', true);
-                    }
+                    console.error('Error loading ' + config.name + ':', error);
                     loadedCount++;
                     if (loadedCount === totalLayers) {
-                        setTimeout(function() { document.getElementById('loading').style.display = 'none'; }, 1000);
+                        document.getElementById('loading').style.display = 'none';
                     }
                 });
         }
@@ -1426,7 +1384,6 @@
             
             div.innerHTML += '<h4 style="margin-top:15px; padding-top:10px; border-top: 1px solid #ddd;">Risk Layers</h4>';
             
-            // CHANGE 4 (UI): risk starts checked, enm starts unchecked
             ['enm', 'risk', 'elevation'].forEach(function(key) {
                 var checked = (key === 'risk') ? 'checked' : '';
                 div.innerHTML += '<label><input type="checkbox" name="layer" value="' + key + '" ' + checked + 
@@ -1441,7 +1398,6 @@
             
             div.innerHTML += '<h4 style="margin-top:15px; padding-top:10px; border-top: 1px solid #ddd;">Species &amp; Survey Data</h4>';
             
-            // CHANGE 3 (UI): all species/survey checkboxes start checked
             Object.keys(speciesSurveyConfigs).forEach(function(key) {
                 var cfg = speciesSurveyConfigs[key];
                 div.innerHTML += '<label><input type="checkbox" name="species-layer" value="' + key + '" checked ' + 
@@ -1519,7 +1475,6 @@
         });
 
         // Load all layers
-        updateStatus('Starting to load layers...');
         Object.keys(layerConfigs).forEach(function(key) { loadLayer(key); });
         loadPlagueCases();
         loadHighRiskBoundaries();

@@ -139,12 +139,6 @@
             border-top: 1px solid #ddd;
         }
         
-        .layer-control .overlay-section h5 {
-            margin: 0 0 8px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        
         .opacity-section {
             margin-top: 15px;
             padding-top: 10px;
@@ -192,7 +186,6 @@
             font-size: 12px;
         }
         
-        /* Popup styling */
         .leaflet-popup-content {
             margin: 10px;
             font-size: 12px;
@@ -220,7 +213,6 @@
             width: 50%;
         }
         
-        /* Coordinate copy notification */
         .copy-notification {
             position: fixed;
             top: 50%;
@@ -258,7 +250,6 @@
     <script>
         var map = L.map('map').setView([-19.5, 47.0], 8);
 
-        // Create custom panes with specific z-index ordering
         map.createPane('backgroundPane');
         map.getPane('backgroundPane').style.zIndex = 250;
         
@@ -277,7 +268,6 @@
         map.createPane('boundariesPane');
         map.getPane('boundariesPane').style.zIndex = 350;
 
-        // Define basemaps
         var streetMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles © Esri',
             maxZoom: 19
@@ -288,10 +278,8 @@
             maxZoom: 19
         });
 
-        // Add default basemap (Satellite)
         satelliteMap.addTo(map);
 
-        // Store layers and georasters
         var layers = {};
         var georasters = {};
         var currentLayer = null;
@@ -304,9 +292,6 @@
         var hotspotPolygonData = null;
         var hotspotDisplayMode = 'Gi_Cluster';
 
-        // =====================================================================
-        // GBIF Role-based coloring for plague ecology
-        // =====================================================================
         var gbifRoleColorPalette = {
             'Reservoir':       '#e31a1c',
             'Host':            '#ff7f00',
@@ -342,7 +327,6 @@
             return gbifRoleColors[role];
         }
 
-        // Species and Survey GeoJSON layers
         var speciesSurveyLayers = {};
         var speciesSurveyConfigs = {
             'gbif_species': {
@@ -466,7 +450,6 @@
             }
         };
 
-        // Add measurement tools
         var drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
 
@@ -501,7 +484,6 @@
         map.on(L.Draw.Event.CREATED, function (event) {
             var layer = event.layer;
             var type = event.layerType;
-            
             if (type === 'polyline') {
                 var length = 0;
                 var latlngs = layer.getLatLngs();
@@ -705,10 +687,6 @@
             }
         }
 
-        // =====================================================================
-        // Species and Survey Data - GeoJSON layers
-        // =====================================================================
-
         function createSvgIcon(shape, color, size) {
             var s = size || 12;
             var svg;
@@ -884,9 +862,6 @@
             });
         }
 
-        // =====================================================================
-        // Hotspot polygon color configurations
-        // =====================================================================
         var hotspotGiClusterColors = {
             3: '#ca0020', 2: '#f4a582', 1: '#fddbc7', 0: '#f7f7f7',
             '-1': '#d1e5f0', '-2': '#92c5de', '-3': '#0571b0'
@@ -1035,7 +1010,6 @@
 
         function loadLayer(layerId) {
             var config = layerConfigs[layerId];
-            updateStatus('Loading ' + config.name + '...');
             fetch(config.file)
                 .then(response => {
                     if (!response.ok) throw new Error('HTTP error! status: ' + response.status);
@@ -1407,7 +1381,7 @@
             div.innerHTML += '<label><input type="checkbox" name="layer" value="species_richness" onchange="toggleLayer(\'species_richness\', this.checked)">' + layerConfigs['species_richness'].name + '</label>';
             
             div.innerHTML += '<div class="overlay-section">';
-            div.innerHTML += '<h5>Overlays</h5>';
+            div.innerHTML += '<h4 style="margin-top:0;">Overlays</h4>';
             div.innerHTML += '<label><input type="checkbox" id="plague-cases-toggle" checked onchange="togglePlagueCases(this.checked)">Plague Cases (1939–2023)</label>';
             div.innerHTML += '<label><input type="checkbox" id="high-risk-toggle" checked onchange="toggleHighRiskBoundaries(this.checked)">Madagascar – ADMIN2</label>';
             div.innerHTML += '</div>';

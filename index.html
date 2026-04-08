@@ -232,6 +232,35 @@
         .copy-notification.show {
             opacity: 1;
         }
+
+        /* Layer description banner */
+        #layer-description-banner {
+            display: none;
+            position: fixed;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+            padding: 10px 18px;
+            max-width: 520px;
+            width: calc(100% - 320px);
+            z-index: 1200;
+            font-size: 12px;
+            color: #333;
+            line-height: 1.5;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        #layer-description-banner strong {
+            display: block;
+            font-size: 13px;
+            margin-bottom: 4px;
+            color: #111;
+        }
     </style>
 </head>
 <body>
@@ -240,6 +269,7 @@
     </div>
     <div id="map"></div>
     <div id="copy-notification" class="copy-notification"></div>
+    <div id="layer-description-banner"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
@@ -248,6 +278,33 @@
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
     <script>
+        // Layer description text for the top banner
+        var layerDescriptions = {
+            'risk': {
+                title: 'Plague Exposure Risk Index (100m)',
+                text: 'Combines a downscaled ecological niche model (~100m resolution) with LandScan population data to identify where plague-favorable conditions overlap with human populations. Ecological suitability and population counts were each classified into four classes (0–3), then multiplied to produce risk scores from 0 (no risk) to 9 (very high risk). Areas with no population or missing data are assigned a risk of 0.'
+            },
+            'hotspot': {
+                title: 'Hot Spot Analysis – Fokontany (Admin Level 4)',
+                text: 'Getis-Ord Gi* hotspot analysis conducted at the fokontany level, the finest administrative division in Madagascar. A population-weighted mean risk score was computed for each fokontany by weighting each pixel\'s risk value by its corresponding population count. The Gi* statistic identifies whether a fokontany and its neighbors have significantly higher (hotspot) or lower (cold spot) weighted risk than expected by chance.'
+            }
+        };
+
+        function updateDescriptionBanner() {
+            var banner = document.getElementById('layer-description-banner');
+            if (activeLayers['hotspot']) {
+                var d = layerDescriptions['hotspot'];
+                banner.innerHTML = '<strong>' + d.title + '</strong>' + d.text;
+                banner.style.display = 'block';
+            } else if (activeLayers['risk']) {
+                var d = layerDescriptions['risk'];
+                banner.innerHTML = '<strong>' + d.title + '</strong>' + d.text;
+                banner.style.display = 'block';
+            } else {
+                banner.style.display = 'none';
+            }
+        }
+
         var map = L.map('map').setView([-19.5, 47.0], 8);
 
         map.createPane('backgroundPane');
@@ -605,7 +662,7 @@
                     updateStatus('Loaded ' + data.features.length + ' plague cases');
                     plagueCasesLayer = L.geoJSON(data, {
                         pointToLayer: function(feature, latlng) {
-                            var size = 24;
+                            var size = 14;
                             var svg = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">' +
                                 '<circle cx="12" cy="12" r="11" fill="white" stroke="#000000" stroke-width="1.5"/>' +
                                 '<circle cx="12" cy="12" r="7" fill="white" stroke="#000000" stroke-width="1.5"/>' +
@@ -977,6 +1034,7 @@
             if (!currentLayer && activeLayers['species_richness']) currentLayer = 'species_richness';
             updateLegend();
             updateHighRiskBoundaryStyle();
+            updateDescriptionBanner();
         }
         
         function switchHotspotMode(mode) {
@@ -1110,6 +1168,7 @@
                         currentLayer = 'risk';
                         updateLegend();
                         updateHighRiskBoundaryStyle();
+                        updateDescriptionBanner();
                     } else if (layerId === 'enm' || layerId === 'elevation' || layerId === 'species_richness') {
                         // Don't auto-show on load
                     } else if (!currentLayer) {
@@ -1118,6 +1177,7 @@
                         currentLayer = layerId;
                         updateLegend();
                         updateHighRiskBoundaryStyle();
+                        updateDescriptionBanner();
                     }
                     
                     if (loadedCount === totalLayers) {
@@ -1147,6 +1207,7 @@
             if (!currentLayer && activeLayers['elevation']) currentLayer = 'elevation';
             updateLegend();
             updateHighRiskBoundaryStyle();
+            updateDescriptionBanner();
         }
         
         function toggleClass(layerId, classValue, show) {
@@ -1337,7 +1398,7 @@
             
             if (plagueCasesLayer) {
                 legendDiv.innerHTML += '<div class="plague-cases-section"><div class="item">' +
-                    '<svg width="16" height="16" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:8px;" xmlns="http://www.w3.org/2000/svg">' +
+                    '<svg width="12" height="12" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:8px;" xmlns="http://www.w3.org/2000/svg">' +
                     '<circle cx="12" cy="12" r="11" fill="white" stroke="#000000" stroke-width="1.5"/>' +
                     '<circle cx="12" cy="12" r="7" fill="white" stroke="#000000" stroke-width="1.5"/>' +
                     '<circle cx="12" cy="12" r="3" fill="white" stroke="#000000" stroke-width="1.5"/>' +

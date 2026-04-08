@@ -1496,8 +1496,28 @@
             var config = layerConfigs[currentLayer];
             var displayValue;
             if (value !== null) {
-                if (config.discreteDisplay) { displayValue = Math.round(value).toString(); }
-                else { displayValue = value.toFixed(4); }
+                if (config.discreteDisplay) {
+                    var intVal = Math.round(value);
+                    if (currentLayer === 'risk' && config.legendItems) {
+                        var matchedItem = null;
+                        for (var i = 0; i < config.legendItems.length; i++) {
+                            if (config.legendItems[i].value === intVal) {
+                                matchedItem = config.legendItems[i];
+                                break;
+                            }
+                        }
+                        if (matchedItem) {
+                            var parts = matchedItem.label.split(' - ');
+                            displayValue = intVal + ' (' + (parts.length > 1 ? parts[1] : matchedItem.label) + ')';
+                        } else {
+                            displayValue = intVal.toString();
+                        }
+                    } else {
+                        displayValue = intVal.toString();
+                    }
+                } else {
+                    displayValue = value.toFixed(4);
+                }
             } else {
                 displayValue = 'No Data';
             }
